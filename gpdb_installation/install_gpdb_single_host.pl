@@ -118,8 +118,16 @@ sub stop_gpdb
     }
     else ## try to stop GPDB
     {
-        ECHO_INFO("Stopping GPDB...");
         my $gphome = $checking_result->{'gphome'};
+
+        ECHO_SYSTEM("Pleaase confirm if you would like to stop GPDB installed in [$gphome]. <yes/no>");
+        while (<STDIN>)
+        {
+            my $input = $_;
+            ECHO_ERROR("Cancelled by user, exit",1) unless (input =~ i/y|yes/);
+        }
+        
+        ECHO_INFO("Stopping GPDB...");
         
         my $max_retry = 5; 
         my $retry = 0;
@@ -162,9 +170,11 @@ sub check_gpdb_isRunning
     my $result;
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | awk '{print \$2,\$8}'));
-    my ($pid,$gphome) = split($gpdb_proc, ' ');
-    
+    my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2,\$8}'));
+    my ($pid,$gphome) = split(',',$gpdb_proc);
+    $gphome = $gphome =~ s/\/bin\/postgres//g;
+
+    ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
     if ($pid =~ /\d+/) ## GPDB is running
     {
         ECHO_INFO("GPDB is running, PID: [$pid], GPHOME: [$gphome]");
@@ -194,7 +204,7 @@ sub run_command
     else
     {
         ECHO_DEBUG("Command excute successfully, return code [$rc]");
-        #ECHO_DEBUG("the result is [$result]");
+        ECHO_DEBUG("the result is [$result]");
         return $result;        
     }
 }
