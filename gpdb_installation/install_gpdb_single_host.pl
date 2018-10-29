@@ -64,7 +64,7 @@ sub extract_binary
 {
     my $package = shift;
     
-    ECHO_ERROR("Unable to locate file [$package]",1) if ( ! -f $package); 
+    ECHO_ERROR("Unable to locate file [$package], run [# $0 -h] to check the usage of the script!",1) if ( ! -f $package); 
 
     ECHO_INFO("Extracting GPDB package [$package] into [$working_folder]...");
     run_command(qq(unzip -qo $package -d $working_folder));
@@ -172,7 +172,7 @@ sub check_gpdb_isRunning
     
     ECHO_INFO("Checking if GPDB is running...");
     my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2,\$8}'));
-    my ($pid,$gphome) = split(',',$gpdb_proc);
+    my ($pid,$gphome) = split(/,/,$gpdb_proc);
     $gphome = $gphome =~ s/\/bin\/postgres//g;
 
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
