@@ -55,7 +55,7 @@ sub working_folder
     }
     elsif ($task eq "clear")
     {
-        ECHO_INFO("Clear the working folder [$working_folder]...");
+        ECHO_INFO("Cleared the working folder [$working_folder]...");
         run_command(qq(rm -rf $working_folder));
     }
 }
@@ -83,7 +83,9 @@ sub install_gpdb_binary
     ECHO_DEBUG("Checking if GPDB is running");
     &stop_gpdb;
 
-    
+
+
+
 
 =old
 # stop current gpdb 
@@ -107,11 +109,11 @@ echo -e "yes\n/opt/greenplum_4.3.28.0\nyes\nyes" | ./greenplum-db-4.3.28.0-rhel5
 
 sub stop_gpdb
 {
-    my $checking_result = &check_gpdb_pid;
+    my $checking_result = &check_gpdb_isRunning;
 
     if ($checking_result->{'pid'} == 0)
     {
-        ECHO_INFO("No need to stop GPDB process, Skip")
+        ECHO_INFO("No need to stop GPDB process, Skip");
         return 0;
     }
     else ## try to stop GPDB
@@ -122,10 +124,10 @@ sub stop_gpdb
         my $max_retry = 5; 
         my $retry = 0;
 
-        while ($retry -le $max_retry)
+        while ($retry <= $max_retry)
         {
             $retry++;
-            ECHO_DEBUG("Stopping GPDB, attempt#[$retry]...")
+            ECHO_DEBUG("Stopping GPDB, attempt#[$retry]...");
 
             run_command(qq(
             source $gphome/greenplum_path.sh;
@@ -163,9 +165,9 @@ sub check_gpdb_isRunning
     my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | awk '{print \$2,\$8}'));
     my ($pid,$gphome) = split($gpdb_proc, ' ');
     
-    if ($pid) ## GPDB is running
+    if ($pid =~ /\d+/) ## GPDB is running
     {
-        ECHO_INFO("GPDB is running, PID: [$PID], GPHOME: [$gphome]");
+        ECHO_INFO("GPDB is running, PID: [$pid], GPHOME: [$gphome]");
         $result->{'pid'} = $pid;
         $result->{'gphome'} = $gphome;
         return $result;
@@ -177,9 +179,6 @@ sub check_gpdb_isRunning
         return $result;
     }
 }
-
-
-
 
 sub run_command
 {
@@ -221,7 +220,12 @@ sub ECHO_ERROR
 {
     my ($Message,$ErrorOut) = @_;
     printColor('red',"[ERROR] $Message"."\n");
-    if ($ErrorOut == 1){ exit(1);}else{return 1;}
+    if ($ErrorOut == 1)
+    { 
+        working_folder("clear");
+        exit(1);
+    }
+    else{return 1;}
 }
 sub printColor
 {
