@@ -120,13 +120,14 @@ sub stop_gpdb
     {
         my $gphome = $checking_result->{'gphome'};
 
+        ### Let user confirm if we want stop current running GPDB service ###
         ECHO_SYSTEM("Pleaase confirm if you would like to stop GPDB installed in [$gphome]. <yes/no>");
         while (<STDIN>)
         {
             my $input = $_;
-            ECHO_ERROR("Cancelled by user, exit",1) unless (input =~ i/y|yes/);
+            ECHO_ERROR("Cancelled by user, exit",1) unless ($input =~ /y|yes/i);
         }
-        
+
         ECHO_INFO("Stopping GPDB...");
         
         my $max_retry = 5; 
