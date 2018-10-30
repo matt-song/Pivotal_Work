@@ -118,7 +118,7 @@ GPDB segment folder:    $segment_folder
     ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
 
     ### adding the host list into GPDB home folder ###
-    ECHO_INFO("Adding host list into [${gp_home}]...")
+    ECHO_INFO("Adding host list into [${gp_home}]...");
     open ALL_HOSTS,'>',"${gp_home}/all_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/all_hosts], exit!",1)};
     open SEG_HOSTS,'>',"${gp_home}/seg_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/seg_hosts], exit!",1)};
 
