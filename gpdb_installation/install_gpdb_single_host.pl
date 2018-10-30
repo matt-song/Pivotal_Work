@@ -112,7 +112,7 @@ GPDB segment folder:    $segment_folder
 
     ECHO_SYSTEM("Installing GPDB package to [$gp_home]...");
     my $rc = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
-    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1);
+    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
 
     ### adding the host list into GPDB home folder ###
     open ALL_HOSTS,'>',"${gp_home}/all_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/all_hosts], exit!",1)};
