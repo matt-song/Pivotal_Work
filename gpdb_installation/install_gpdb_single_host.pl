@@ -119,8 +119,8 @@ GPDB segment folder:    $segment_folder
     open SEG_HOSTS,'>',"${gp_home}/seg_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/seg_hosts], exit!",1)};
 
     print SEG_HOSTS "$_\n" foreach (@segment_list);
-    my @all_host = push(@segment_list, $master_hostname);
-    print ALL_HOSTS "$_\n" foreach( @all_host);
+    push(@segment_list, $master_hostname);
+    print ALL_HOSTS "$_\n" foreach (@segment_list);
 
     close ALL_HOSTS; close SEG_HOSTS;
 
