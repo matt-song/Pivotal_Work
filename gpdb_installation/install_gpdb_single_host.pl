@@ -122,11 +122,9 @@ sub stop_gpdb
 
         ### Let user confirm if we want stop current running GPDB service ###
         ECHO_SYSTEM("Pleaase confirm if you would like to stop GPDB installed in [$gphome]. <yes/no>");
-        while (<STDIN>)
-        {
-            my $input = $_;
-            ECHO_ERROR("Cancelled by user, exit",1) unless ($input =~ /y|yes/i);
-        }
+        
+        my $input = (<STDIN>);
+        ECHO_ERROR("Cancelled by user, exit",1) unless ($input =~ /y|yes/i);
 
         ECHO_INFO("Stopping GPDB...");
         
@@ -142,7 +140,7 @@ sub stop_gpdb
             source $gphome/greenplum_path.sh;
             gpstop -M fast -a > /dev/null;) );
 
-            my $result = &check_gpdb_pid;
+            my $result = &check_gpdb_isRunning;
 
             if ($result->{'pid'} == 0) ## successfully shutdown
             {
@@ -173,7 +171,7 @@ sub check_gpdb_isRunning
     ECHO_INFO("Checking if GPDB is running...");
     my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$gpdb_proc);
-    $gphome = $gphome =~ s/\/bin\/postgres//g;
+    ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
     if ($pid =~ /\d+/) ## GPDB is running
