@@ -15,9 +15,11 @@ my $gpdb_bin = $opts{'f'};
 
 my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
-my $gpdb_master_folder = "/data/master";
-my $gpdb_segment_folder = "/data/segment"; 
+my $gpdb_master_home = "/data/master";
+my $gpdb_segment_home = "/data/segment"; 
 my $gpdb_segment_num = 2;
+my $master_hostname = ('mdw');                  ## master host
+my @segment_list = ('sdw1,sdw2');               ## segment hosts list
 
 &print_help if $opts{'h'};
 
@@ -30,7 +32,7 @@ working_folder("create");
 my $gpdb_binary = extract_binary("$gpdb_bin");
 
 ## Steo#3 install the binary to $gpdp_home_folder
-install_gpdb_binary();
+install_gpdb_binary("$gpdb_binary");
 
 working_folder("clear");
 
@@ -55,8 +57,8 @@ sub working_folder
     }
     elsif ($task eq "clear")
     {
-        ECHO_INFO("Cleared the working folder [$working_folder]...");
         run_command(qq(rm -rf $working_folder));
+        ECHO_INFO("Cleared the working folder [$working_folder]...");
     }
 }
 
@@ -83,6 +85,44 @@ sub install_gpdb_binary
     ECHO_DEBUG("Checking if GPDB is running");
     &stop_gpdb;
 
+    ### print the settings and ask user to confirm ###
+    ECHO_INFO("Will start to install binary [$binary], please review below setting");
+    
+    my $gp_ver = $1 if ($binary =~ /greenplum-db-([\d\.]+)-/);
+    my $gp_home = "${gpdp_home_folder}/greenplum_${gp_ver}";
+    my $master_folder = "$gpdb_master_home/master_${gp_ver}";
+    my $segment_count = $gpdb_segment_num;
+    my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
+
+    ECHO_SYSTEM("
+GPDB Version:           $gp_ver
+GPDB home folder:       $gp_home
+GPDB master folder:     $master_folder
+GPDB segment count:     $segment_count
+GPDB segment folder:    $segment_folder
+");
+
+    &user_confirm("Do you want to continue the installation? [yes/no]");
+
+    if ( -d $gp_home )
+    {
+        &user_confirm("GP home folder [$gp_home] already existed, remove it? [yes/no]");
+        run_command("rm -rf $gp_home");
+    }
+
+    ECHO_SYSTEM("Installing GPDB package to [$gp_home]...");
+    my $rc = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
+    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1);
+
+    ### adding the host list into GPDB home folder ###
+    open ALL_HOSTS,'>',"${gp_home}/all_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/all_hosts], exit!",1)};
+    open SEG_HOSTS,'>',"${gp_home}/seg_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/seg_hosts], exit!",1)};
+
+    print SEG_HOSTS "$_\n" foreach (@segment_list);
+    my @all_host = push(@segment_list, $master_hostname);
+    print ALL_HOSTS "$_\n" foreach( @all_host );
+
+    close ALL_HOSTS; close SEG_HOSTS;
 
 
 
@@ -121,11 +161,9 @@ sub stop_gpdb
         my $gphome = $checking_result->{'gphome'};
 
         ### Let user confirm if we want stop current running GPDB service ###
-        ECHO_SYSTEM("Pleaase confirm if you would like to stop GPDB installed in [$gphome]. <yes/no>");
-        
-        my $input = (<STDIN>);
-        ECHO_ERROR("Cancelled by user, exit",1) unless ($input =~ /y|yes/i);
+        &user_confirm("Pleaase confirm if you would like to stop GPDB installed in [$gphome]? <yes/no>");
 
+        ### Stop the GPDB ###
         ECHO_INFO("Stopping GPDB...");
         
         my $max_retry = 5; 
@@ -134,7 +172,7 @@ sub stop_gpdb
         while ($retry <= $max_retry)
         {
             $retry++;
-            ECHO_DEBUG("Stopping GPDB, attempt#[$retry]...");
+            ECHO_DEBUG("Stopping GPDB... Attempt#[$retry]...");
 
             run_command(qq(
             source $gphome/greenplum_path.sh;
@@ -151,7 +189,7 @@ sub stop_gpdb
             {
                 if ($retry eq $max_retry)
                 {
-                    ECHO_ERROR("Failed to stop GPDB, maximum retry count [$max_retry] has reached, exit!!", 1);
+                    ECHO_ERROR("Failed to stop GPDB, maximum retry count [$max_retry] has reached, please stop GPDB manually and try again!", 1);
                 }
                 else
                 {
@@ -163,7 +201,14 @@ sub stop_gpdb
         }
     }
 }
-
+sub user_confirm
+{
+    my $msg = shift;
+    ECHO_SYSTEM("$msg");
+    my $input = (<STDIN>);
+    ECHO_ERROR("Cancelled by user, exit!", 1) unless ($input =~ /y|yes/i);
+    return 0;
+}
 sub check_gpdb_isRunning
 {
     my $result;
@@ -193,11 +238,12 @@ sub run_command
 {
     my $cmd = shift;
     ECHO_DEBUG("will run command [$cmd]..");
-    chomp(my $result = `$cmd` );
+    chomp(my $result = `$cmd 2>&1` );
     my $rc = "$?";
     if ($rc)
     {
         ECHO_ERROR("Failed to excute command [$cmd], return code is $rc"); 
+        ECHO_ERROR("ERROR: [$result]");
         return $rc;
     }
     else
