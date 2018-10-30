@@ -18,8 +18,8 @@ my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data/segment"; 
 my $gpdb_segment_num = 2;
-my $master_hostname = ('mdw');                  ## master host
-my @segment_list = ('sdw1,sdw2');               ## segment hosts list
+my $master_hostname = 'mdw';                      ## master host
+my @segment_list = ('sdw1','sdw2');               ## segment hosts list
 
 &print_help if $opts{'h'};
 
@@ -110,7 +110,7 @@ GPDB segment folder:    $segment_folder
         run_command("rm -rf $gp_home");
     }
 
-    ECHO_SYSTEM("Installing GPDB package to [$gp_home]...");
+    ECHO_INFO("Installing GPDB package to [$gp_home]...");
     my $rc = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
     ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
 
@@ -120,7 +120,7 @@ GPDB segment folder:    $segment_folder
 
     print SEG_HOSTS "$_\n" foreach (@segment_list);
     my @all_host = push(@segment_list, $master_hostname);
-    print ALL_HOSTS "$_\n" foreach( @all_host );
+    print ALL_HOSTS "$_\n" foreach( @all_host);
 
     close ALL_HOSTS; close SEG_HOSTS;
 
