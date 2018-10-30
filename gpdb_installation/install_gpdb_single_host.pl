@@ -34,6 +34,9 @@ my $gpdb_binary = extract_binary("$gpdb_bin");
 ## Steo#3 install the binary to $gpdp_home_folder
 install_gpdb_binary("$gpdb_binary");
 
+## Step#4 initialize the GPDB
+
+
 working_folder("clear");
 
 
@@ -115,35 +118,63 @@ GPDB segment folder:    $segment_folder
     ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
 
     ### adding the host list into GPDB home folder ###
+    ECHO_INFO("Adding host list into [${gp_home}]...")
     open ALL_HOSTS,'>',"${gp_home}/all_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/all_hosts], exit!",1)};
     open SEG_HOSTS,'>',"${gp_home}/seg_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/seg_hosts], exit!",1)};
 
     print SEG_HOSTS "$_\n" foreach (@segment_list);
     push(@segment_list, $master_hostname);
     print ALL_HOSTS "$_\n" foreach (@segment_list);
-
     close ALL_HOSTS; close SEG_HOSTS;
 
+    ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
+    ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
+    open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
+    my $line = qq( export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1' );
+    print GP_PATH "$line\n";
+    close GP_PATH;
+   
+    return 0;
+}
 
+sub init_gpdb
+{
 
 
 =old
-# stop current gpdb 
 
-ps -ef | grep silent | grep master | grep "^gpadmin" | awk '{print $2,$8}'
-12374 /opt/greenplum_4.3.25.1/bin/postgres
+[root@greenplum-aio][master]# mkdir -p /data/master/master_4.3.28.0; chown gpadmin /data/master/master_4.3.28.0
+[root@greenplum-aio][master]# ls -ld /data/master/master_4.3.28.0
+drwxr-xr-x. 2 gpadmin root 6 Oct 26 12:36 /data/master/master_4.3.28.0
 
-# remove the folder /opt/greenplum-.4.3.28.0 if exist 
+# mkdir -p /data/segment/4.3.28.0/{primary1,primary2,mirror1,mirror2}
+# chown -R gpadmin /data/segment/4.3.28.0
 
-echo -e "yes\n/opt/greenplum_4.3.28.0\nyes\nyes" | ./greenplum-db-4.3.28.0-rhel5-x86_64.bin
+# ls -ld /data/segment/4.3.28.0/
+drwxr-xr-x. 6 gpadmin root 68 Oct 26 12:39 /data/segment/4.3.28.0/
 
-# cd /opt/greenplum_4.3.28.0/
-# source greenplum_path.sh
+$ cat gpinitsystem_config | egrep -v "^#|^$"
+ARRAY_NAME="gpdb_4.3.28.0"
+SEG_PREFIX=gpdb_4.3.28.0_
+PORT_BASE=20000
+declare -a DATA_DIRECTORY=(/data/segment/4.3.28.0/primary1 /data/segment/4.3.28.0/primary2)
+MASTER_HOSTNAME=mdw
+MASTER_DIRECTORY=/data/master/master_4.3.28.0
+MASTER_PORT=5432
+TRUSTED_SHELL=ssh
+CHECK_POINT_SEGMENTS=8
+ENCODING=UNICODE
+MIRROR_PORT_BASE=21000
+REPLICATION_PORT_BASE=22000
+MIRROR_REPLICATION_PORT_BASE=23000
+declare -a MIRROR_DATA_DIRECTORY=(/data/segment/4.3.28.0/mirror1 /data/segment/4.3.28.0/mirror2)
 
-# echo -e "mdw\nsdw1" > all_hosts
-# echo "sdw1" > seg_hosts
+echo export MASTER_DATA_DIRECTORY='/data/master/master_4.3.25.1/gpdb_4.3.25.1_-1' >> gphomexxxxxx
+gpinitsystem -c gpinitsystem_config -h seg_hosts
+# createdb gpadmin
+
+
 =cut
-
 
 }
 
