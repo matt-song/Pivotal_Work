@@ -108,7 +108,8 @@ sub install_gpdb_binary
     GPDB home folder:       $gp_home
     GPDB master folder:     $master_folder
     GPDB segment count:     $segment_count
-    GPDB segment folder:    $segment_folder");
+    GPDB segment folder:    $segment_folder
+");
 
     $gp_info->{'ver'} = $gp_ver;
     $gp_info->{'gp_home'} = $gp_home;
@@ -265,10 +266,13 @@ sub set_env
     
     ### maybe adding some more jobs at here ###
 
-    ECHO_INFO("All set, you may run below command to login to gpdb, enjoy!
+    ECHO_SYSTEM("
+###############################################################
+# All set, you may run below command to login to gpdb, enjoy! #
+###############################################################
 
-    # source $gp_home/greenplum_path.sh
-    # psql 
+  # source $gp_home/greenplum_path.sh
+  # psql 
 ");
 
 }
