@@ -8,10 +8,11 @@ use strict;
 use Data::Dumper;
 use Term::ANSIColor;
 use Getopt::Std;
-my %opts; getopts('hf:D', \%opts);
+my %opts; getopts('hf:Dy', \%opts);
 
 my $DEBUG = $opts{'D'};   
 my $gpdb_bin = $opts{'f'};
+my $ALL_YES = $opts{'y'};
 
 my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
@@ -103,12 +104,12 @@ sub install_gpdb_binary
     my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
 
     ECHO_SYSTEM("
-GPDB Version:           $gp_ver
-GPDB home folder:       $gp_home
-GPDB master folder:     $master_folder
-GPDB segment count:     $segment_count
-GPDB segment folder:    $segment_folder
-");
+    GPDB Version:           $gp_ver
+    GPDB home folder:       $gp_home
+    GPDB master folder:     $master_folder
+    GPDB segment count:     $segment_count
+    GPDB segment folder:    $segment_folder");
+
     $gp_info->{'ver'} = $gp_ver;
     $gp_info->{'gp_home'} = $gp_home;
 
@@ -329,8 +330,17 @@ sub stop_gpdb
 sub user_confirm
 {
     my $msg = shift;
-    ECHO_SYSTEM("$msg");
-    my $input = (<STDIN>);
+
+    my $input;
+    if ($ALL_YES)
+    {
+        $input = 'yes';
+    }
+    else
+    {
+        ECHO_SYSTEM("$msg");
+        $input = (<STDIN>);
+    }
 
     if ($input =~ /no|n/i)
     {
