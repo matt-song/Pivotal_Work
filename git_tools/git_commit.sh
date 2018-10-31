@@ -1,8 +1,7 @@
 #!/bin/bash
 
 DATE_NOW=`date +%F`
-FOLDER="/Users/xsong/git_repository/pv_work"
-cd $FOLDER
+cd ~/git_repository/pv_work
 
 git add *
 git commit -m "Updated at $DATE_NOW"
