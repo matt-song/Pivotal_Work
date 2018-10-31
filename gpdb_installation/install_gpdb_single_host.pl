@@ -38,6 +38,9 @@ my $gp_info = install_gpdb_binary("$gpdb_binary");
 ## Step#4 initialize the GPDB
 init_gpdb($gp_info);
 
+## Step#5 Set the environment for newly installed GPDB
+#set_env($gp_info);
+
 working_folder("clear");
 
 
@@ -228,20 +231,9 @@ $conf_mirror
         su $gp_user -c "source ${gp_home}/greenplum_path.sh;
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a 1>/dev/null 
     ));
+    ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1) if ($rc);
 
-    if ($rc) ### failed
-    {
-        ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1);
-    }
-    else
-    {
-        ECHO_INFO("successfuly initialized the GPDB, Creating default DB for [$gp_user]");
-        run_command(qq(
-            su $gp_user -c "source ${gp_home}/greenplum_path.sh;
-            createdb $gp_user;
-        ));
-
-    }
+    return 0;
 }
 
 sub stop_gpdb
