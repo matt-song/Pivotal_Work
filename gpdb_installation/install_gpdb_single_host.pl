@@ -253,7 +253,7 @@ sub set_env
 {
     my $gp_info = shift;
 
-    my $gp_home = $gp_info('gp_home');
+    my $gp_home = $gp_info->{'gp_home'};
 
     ### create the the DB for GP user ###
     ECHO_INFO("Creating database for [$gp_user]...");
