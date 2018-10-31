@@ -9,7 +9,7 @@ use Term::ANSIColor;
 use Data::Dumper;
 
 my $gpdp_home_folder = "/opt";
-my $DEBUG = 0;
+my $DEBUG = 1;
 
 ### stop GPDB if it is running ###
 &stop_gpdb;
@@ -19,17 +19,19 @@ select_gpdb($gpdp_home_folder);
 
 sub select_gpdb
 {
-    my $gp_list = run_command("ls $gpdp_home_folder | grep greenplum_ 2>/dev/null");
+    my $gp_list = run_command("ls $gpdp_home_folder | grep '^greenplum_' 2>/dev/null");
 
     my $hash;
 
-    ECHO_INFO("Find below GPDB installed: ");
+    ECHO_INFO("Find below GPDB installed: \n");
     my $count = 1;
     foreach my $gp_server (split ('^',$gp_list))
     {
-        next if ( $gp_server !~ /^opt\//);
-        ECHO_SYSTEM(qq(\n    [$count]:    $gp_server));
+        chomp($gp_server);
+        next if ( $gp_server !~ /^greenplum_/);
+        ECHO_SYSTEM(qq(    [$count]:    $gp_server));
         $hash->{$count} = "$gpdp_home_folder/$gp_server";
+        $count++;
     }
     print Dumper $hash;
 
