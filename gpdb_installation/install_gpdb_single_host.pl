@@ -107,6 +107,7 @@ GPDB segment count:     $segment_count
 GPDB segment folder:    $segment_folder
 ");
     $gp_info->{'ver'} = $gp_ver;
+    $gp_info->{'gp_home'} = $gp_home;
 
     &user_confirm("Do you want to continue the installation? [yes/no]");
 
@@ -145,6 +146,8 @@ sub init_gpdb
 {
     my $gp_info = shift;
     my $gp_ver = $gp_info->{'ver'};
+    my $gp_home = $gp_info->{'gp_home'};
+
     ECHO_ERROR("No GPDB version got, exit!") if (! $gp_ver);
     
     ECHO_INFO("Start to initializing the GPDB");
@@ -199,6 +202,8 @@ sub init_gpdb
     ECHO_DEBUG("conf file: [$conf_primary] and [$conf_mirror]");
 
     ### initiate the gpdb server ###
+    ECHO_INFO("Creating the gpinitsystem_config file to [$gp_home]..");
+    open INIT, '>', "$gp_home/gpinitsystem_config" or do {ECHO_ERROR("unable to write file [$gp_home/gpinitsystem_config], exit!",1)};
     my $gpinitsystem_config = qq(
 ARRAY_NAME="gpdb_${gp_ver}"
 SEG_PREFIX=gpdb_${gp_ver}_
@@ -215,38 +220,28 @@ REPLICATION_PORT_BASE=22000
 MIRROR_REPLICATION_PORT_BASE=23000
 $conf_mirror
 );
+    ECHO_DEBUG("the gpinitsystem_config file is like below [\n$gpinitsystem_config\n]");
+    print INIT "$gpinitsystem_config";
 
+    ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
+    my $rc = run_command(qq( 
+        su $gp_user -c "source ${gp_home}/greenplum_path.sh;
+        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a 1>/dev/null 
+    ));
 
+    if ($rc) ### failed
+    {
+        ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1);
+    }
+    else
+    {
+        ECHO_INFO("successfuly initialized the GPDB, Creating default DB for [$gp_user]");
+        run_command(qq(
+            su $gp_user -c "source ${gp_home}/greenplum_path.sh;
+            createdb $gp_user;
+        ));
 
-
-
-
-=old
-
-
-$ cat gpinitsystem_config | egrep -v "^#|^$"
-ARRAY_NAME="gpdb_4.3.28.0"
-SEG_PREFIX=gpdb_4.3.28.0_
-PORT_BASE=20000
-declare -a DATA_DIRECTORY=(/data/segment/4.3.28.0/primary1 /data/segment/4.3.28.0/primary2)
-MASTER_HOSTNAME=mdw
-MASTER_DIRECTORY=/data/master/master_4.3.28.0
-MASTER_PORT=5432
-TRUSTED_SHELL=ssh
-CHECK_POINT_SEGMENTS=8
-ENCODING=UNICODE
-MIRROR_PORT_BASE=21000
-REPLICATION_PORT_BASE=22000
-MIRROR_REPLICATION_PORT_BASE=23000
-declare -a MIRROR_DATA_DIRECTORY=(/data/segment/4.3.28.0/mirror1 /data/segment/4.3.28.0/mirror2)
-
-
-gpinitsystem -c gpinitsystem_config -h seg_hosts
-# createdb gpadmin
-
-
-=cut
-
+    }
 }
 
 sub stop_gpdb
