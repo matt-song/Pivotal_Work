@@ -253,8 +253,22 @@ sub set_env
 {
     my $gp_info = shift;
 
-    print Dumper $gp_info;
+    my $gp_home = $gp_info('gp_home');
 
+    ### create the the DB for GP user ###
+    ECHO_INFO("Creating database for [$gp_user]...");
+    run_command(qq(
+        source "$gp_home/greenplum_path.sh;
+        createdb $gp_user;
+    ));
+    
+    ### maybe adding some more jobs at here ###
+
+    ECHO_INFO("All set, you may run below command to login to gpdb, enjoy!
+
+    # source $gp_home/greenplum_path.sh
+    # psql 
+");
 
 }
 
