@@ -39,7 +39,7 @@ my $gp_info = install_gpdb_binary("$gpdb_binary");
 init_gpdb($gp_info);
 
 ## Step#5 Set the environment for newly installed GPDB
-#set_env($gp_info);
+set_env($gp_info);
 
 working_folder("clear");
 
@@ -188,14 +188,6 @@ sub init_gpdb
 
         ECHO_DEBUG("Creating segment folder [$primary] and [$mirror]");
 
-#        foreach my $folder ($primary, $mirror)
-#        {
-#            if (-d $folder)
-#            {
-#                user_confirm("Segment folder [$folder] already existed, remove it?"); 
-#                run_command("rm -rf $folder");
-#            }
-#        }
         run_command("mkdir -p $primary");
         run_command("mkdir -p $mirror");
         run_command("chown -R gpadmin $segment_folder");
@@ -236,9 +228,34 @@ $conf_mirror
         source ${gp_home}/greenplum_path.sh; 
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep 'WARNING|ERROR'
     ));
-    ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1) if ($rc);
+    
+    ### verify if the newly installed GPDB has started ###
+    if ($rc)
+    {
+        ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1);
+    }
+    else
+    {
+        ECHO_INFO("Done! Checking if GPDB with [$gp_ver] has started");
+        my $result = &check_gpdb_isRunning;
+        if ($result->{'pid'})
+        {
+            ECHO_INFO("GPDB has been initialized and started successfully, PID [$result->{'pid'}]");
+        }
+        else
+        {
+            ECHO_ERROR("Failed to initialize GPDB, please check the logs and try again!",1);
+        }
+    }
+}
 
-    return 0;
+sub set_env
+{
+    my $gp_info = shift;
+
+    print Dumper $gp_info;
+
+
 }
 
 sub stop_gpdb
