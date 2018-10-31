@@ -151,11 +151,11 @@ sub init_gpdb
 
     ### create master folder ###
     my $master_folder = "${gpdb_master_home}/master_${gp_ver}";
-    ECHO_INFO("Creating the master folder [$master_folder]...")
+    ECHO_INFO("Creating the master folder [$master_folder]...");
 
     if (-d $master_folder)
     {
-        $user_confirm("Master folder [$master_folder] already existed, remove it?");
+        user_confirm("Master folder [$master_folder] already existed, remove it?");
         run_command("rm -rf $master_folder");
     }
     run_command("mkdir -p $master_folder; chown gpadmin $master_folder");
@@ -165,18 +165,18 @@ sub init_gpdb
     ECHO_INFO("Creating segment folder under [$segment_folder]...");
 
     my $count = 0;
-    while ( $count -le $gpdb_segment_num )
+    while ( $count le $gpdb_segment_num )
     {
         $count++;
         
-        my $primary = "$segment_folder/primary${count}"
+        my $primary = "$segment_folder/primary${count}";
         my $mirror = "$segment_folder/mirror${count}";
 
         ECHO_DEBUG("Creating segment folder [$primary] and [$mirror]");
 
-        foreach $folder ($primary, $mirror)
+        foreach my $folder ($primary, $mirror)
         {
-            $user_confirm("Segment folder [$folder] already existed, remove it?");
+            user_confirm("Segment folder [$folder] already existed, remove it?");
             run_command("rm -rf $folder");
         }
         run_command("mkdir -p $primary");
