@@ -20,6 +20,7 @@ my $gpdb_segment_home = "/data/segment";
 my $gpdb_segment_num = 2;
 my $master_hostname = 'mdw';                      ## master host
 my @segment_list = ('sdw1','sdw2');               ## segment hosts list
+my $gp_user = 'gpadmin';
 
 &print_help if $opts{'h'};
 
@@ -32,10 +33,10 @@ working_folder("create");
 my $gpdb_binary = extract_binary("$gpdb_bin");
 
 ## Steo#3 install the binary to $gpdp_home_folder
-install_gpdb_binary("$gpdb_binary");
+my $gp_info = install_gpdb_binary("$gpdb_binary");
 
 ## Step#4 initialize the GPDB
-
+init_gpdb($gp_info);
 
 working_folder("clear");
 
@@ -84,6 +85,7 @@ sub extract_binary
 sub install_gpdb_binary
 {
     my $binary = shift;
+    my $gp_info;
 
     ECHO_DEBUG("Checking if GPDB is running");
     &stop_gpdb;
@@ -104,6 +106,7 @@ GPDB master folder:     $master_folder
 GPDB segment count:     $segment_count
 GPDB segment folder:    $segment_folder
 ");
+    $gp_info->{'ver'} = $gp_ver;
 
     &user_confirm("Do you want to continue the installation? [yes/no]");
 
@@ -130,15 +133,59 @@ GPDB segment folder:    $segment_folder
     ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
     ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
-    my $line = qq( export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1' );
+    my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
     print GP_PATH "$line\n";
     close GP_PATH;
    
-    return 0;
+    ECHO_INFO("GPDB binary has been successfully installed to [$gp_home]");
+    return $gp_info;
 }
 
 sub init_gpdb
 {
+    my $gp_info = shift;
+    my $gp_ver = $gp_info->{'ver'};
+    ECHO_ERROR("No GPDB version got, exit!") if (! $gp_ver);
+    
+    ECHO_INFO("Start to initializing the GPDB");
+
+    ### create master folder ###
+    my $master_folder = "${gpdb_master_home}/master_${gp_ver}";
+    ECHO_INFO("Creating the master folder [$master_folder]...")
+
+    if (-d $master_folder)
+    {
+        $user_confirm("Master folder [$master_folder] already existed, remove it?");
+        run_command("rm -rf $master_folder");
+    }
+    run_command("mkdir -p $master_folder; chown gpadmin $master_folder");
+
+    ### create segment folder ###
+    my $segment_folder = "${gpdb_segment_home}/segment_${gp_ver}";
+    ECHO_INFO("Creating segment folder under [$segment_folder]...");
+
+    my $count = 0;
+    while ( $count -le $gpdb_segment_num )
+    {
+        $count++;
+        
+        my $primary = "$segment_folder/primary${count}"
+        my $mirror = "$segment_folder/mirror${count}";
+
+        ECHO_DEBUG("Creating segment folder [$primary] and [$mirror]");
+
+        foreach $folder ($primary, $mirror)
+        {
+            $user_confirm("Segment folder [$folder] already existed, remove it?");
+            run_command("rm -rf $folder");
+        }
+        run_command("mkdir -p $primary");
+        run_command("mkdir -p $mirror");
+        run_command("chown -R gpadmin $segment_folder");
+    }
+
+
+
 
 
 =old
