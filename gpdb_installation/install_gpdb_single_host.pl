@@ -258,7 +258,7 @@ sub set_env
     ### create the the DB for GP user ###
     ECHO_INFO("Creating database for [$gp_user]...");
     run_command(qq(
-        source "$gp_home/greenplum_path.sh;
+        source $gp_home/greenplum_path.sh;
         createdb $gp_user;
     ));
     
