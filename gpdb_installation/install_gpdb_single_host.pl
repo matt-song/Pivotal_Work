@@ -287,8 +287,20 @@ sub user_confirm
     my $msg = shift;
     ECHO_SYSTEM("$msg");
     my $input = (<STDIN>);
-    ECHO_ERROR("Cancelled by user, exit!", 1) unless ($input =~ /y|yes/i);
-    return 0;
+
+    if ($input =~ /no|n/i)
+    {
+        ECHO_ERROR("Cancelled by user, exit!", 1);
+    }
+    elsif ($input =~ /yes|y/i) 
+    {
+        return 0;
+    }
+    else
+    {
+        ECHO_ERROR("Please input 'yes' or 'no'!");
+        &user_confirm($msg);
+    }
 }
 sub check_gpdb_isRunning
 {
