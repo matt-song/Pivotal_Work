@@ -19,7 +19,7 @@ my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data/segment"; 
 my $gpdb_segment_num = 2;
 my $master_hostname = 'mdw';                      ## master host
-my @segment_list = ('sdw1','sdw2');               ## segment hosts list
+my @segment_list = ('sdw1');               ## segment hosts list
 my $gp_user = 'gpadmin';
 
 &print_help if $opts{'h'};
@@ -168,6 +168,11 @@ sub init_gpdb
 
     ### create segment folder ###
     my $segment_folder = "${gpdb_segment_home}/segment_${gp_ver}";
+    if (-d $segment_folder)
+    {
+        user_confirm("Segment folder [$segment_folder] already existed, remove it?");
+        run_command("rm -rf $segment_folder");
+    }
     ECHO_INFO("Creating segment folder under [$segment_folder]...");
 
     my $count = 0;
@@ -183,14 +188,14 @@ sub init_gpdb
 
         ECHO_DEBUG("Creating segment folder [$primary] and [$mirror]");
 
-        foreach my $folder ($primary, $mirror)
-        {
-            if (-d $folder)
-            {
-                user_confirm("Segment folder [$folder] already existed, remove it?"); 
-                run_command("rm -rf $folder");
-            }
-        }
+#        foreach my $folder ($primary, $mirror)
+#        {
+#            if (-d $folder)
+#            {
+#                user_confirm("Segment folder [$folder] already existed, remove it?"); 
+#                run_command("rm -rf $folder");
+#            }
+#        }
         run_command("mkdir -p $primary");
         run_command("mkdir -p $mirror");
         run_command("chown -R gpadmin $segment_folder");
@@ -227,9 +232,9 @@ $conf_mirror
     print INIT "$gpinitsystem_config";
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
-    my $rc = run_command(qq( 
-        su $gp_user -c "source ${gp_home}/greenplum_path.sh;
-        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a 1>/dev/null 
+    my $rc = run_command(qq (
+        source ${gp_home}/greenplum_path.sh; 
+        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep 'WARNING|ERROR'
     ));
     ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1) if ($rc);
 
@@ -265,7 +270,7 @@ sub stop_gpdb
 
             run_command(qq(
             source $gphome/greenplum_path.sh;
-            gpstop -M fast -a > /dev/null;) );
+            gpstop -M fast -a | egrep "WARNING|ERROR";) );
 
             my $result = &check_gpdb_isRunning;
 
