@@ -1,15 +1,15 @@
 #!/usr/bin/perl
 #################################################################
 # Author:      Matt Song                                        #
-# Create Date: 2018.10.27                                       #
-# Description: Install GPDB in single host                      #
+# Create Date: 2018.10.31                                       #
+# Description: Switch the GPDB server to target build           #
 #################################################################
 use strict;
 use Term::ANSIColor;
 use Data::Dumper;
 
 my $gpdp_home_folder = "/opt";
-my $DEBUG = 1;
+my $DEBUG = 0;
 
 ### stop GPDB if it is running ###
 &stop_gpdb;
@@ -28,7 +28,7 @@ sub switch_gpdb
 
     ## remove the greenplum-db file and relink to target folder
     ECHO_INFO("Relink the greenplum-db to [$gp_folder]...");
-    run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -f "$gpdp_home_folder/greenplum-db");
+    run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
     run_command(qq( ln -s $gp_folder $gpdp_home_folder/greenplum-db));
 
     ## start the gpdb ##
@@ -69,11 +69,10 @@ sub select_gpdb
     ECHO_ERROR("No GPDB found in [$gpdp_home_folder], exit!",1) if ($count == 0);
 
     ### ask user choose which GPDB to switch ###
-    ECHO_SYSTEM("please select which GPDB you would like to change to:");
-    my $input = (<STDIN>);
-
     while (1)
     {
+        ECHO_SYSTEM("\nplease select which GPDB you would like to change to:");
+        chomp(my $input = (<STDIN>));
         if ($hash->{$input})
         {
             $gp_target = $hash->{$input};
@@ -145,7 +144,7 @@ sub user_confirm
 {
     my $msg = shift;
 
-    ECHO_SYSTEM("$msg");
+    ECHO_SYSTEM("\n$msg");
     my $input = (<STDIN>);
 
     if ($input =~ /no|n/i)
