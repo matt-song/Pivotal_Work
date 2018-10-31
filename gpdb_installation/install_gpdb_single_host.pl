@@ -165,7 +165,7 @@ sub init_gpdb
     ECHO_INFO("Creating segment folder under [$segment_folder]...");
 
     my $count = 0;
-    while ( $count le $gpdb_segment_num )
+    while ( $count lt $gpdb_segment_num )
     {
         $count++;
         
@@ -176,8 +176,11 @@ sub init_gpdb
 
         foreach my $folder ($primary, $mirror)
         {
-            user_confirm("Segment folder [$folder] already existed, remove it?");
-            run_command("rm -rf $folder");
+            if (-d $folder)
+            {
+                user_confirm("Segment folder [$folder] already existed, remove it?"); 
+                run_command("rm -rf $folder");
+            }
         }
         run_command("mkdir -p $primary");
         run_command("mkdir -p $mirror");
