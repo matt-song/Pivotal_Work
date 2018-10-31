@@ -15,26 +15,76 @@ my $DEBUG = 1;
 &stop_gpdb;
 
 ### let user choose which version to start ###
-select_gpdb($gpdp_home_folder);
+my $targer_gpdb = select_gpdb($gpdp_home_folder);
+
+### finally, switch the gpdb ###
+switch_gpdb($targer_gpdb);
+
+sub switch_gpdb
+{
+    my $gp_folder = shift;
+
+    my $greenplum_path = "$gp_folder/greenplum_path.sh";
+
+    ## remove the greenplum-db file and relink to target folder
+    ECHO_INFO("Relink the greenplum-db to [$gp_folder]...");
+    run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -f "$gpdp_home_folder/greenplum-db");
+    run_command(qq( ln -s $gp_folder $gpdp_home_folder/greenplum-db));
+
+    ## start the gpdb ##
+    ECHO_INFO("Starting GPDB...");
+    run_command(qq(
+        source $greenplum_path;
+        gpstart -a | egrep "ERROR|WARNING"
+    ));
+    my $result = &check_gpdb_isRunning;
+    if ($result->{'pid'})
+    {
+        ECHO_INFO("GPDB has started successfully, PID [$result->{'pid'}]");
+    }
+    else
+    {
+        ECHO_ERROR("Failed to start GPDB, please check the logs and try again!",1);
+    }
+}
 
 sub select_gpdb
 {
-    my $gp_list = run_command("ls $gpdp_home_folder | grep '^greenplum_' 2>/dev/null");
+    my $gp_list = run_command("ls $gpdp_home_folder | grep '^greenplum_'");
+    my $gp_target;
 
     my $hash;
 
     ECHO_INFO("Find below GPDB installed: \n");
-    my $count = 1;
+    my $count = 0;
     foreach my $gp_server (split ('^',$gp_list))
     {
         chomp($gp_server);
         next if ( $gp_server !~ /^greenplum_/);
+        
+        $count++;
         ECHO_SYSTEM(qq(    [$count]:    $gp_server));
         $hash->{$count} = "$gpdp_home_folder/$gp_server";
-        $count++;
     }
-    print Dumper $hash;
+    ECHO_ERROR("No GPDB found in [$gpdp_home_folder], exit!",1) if ($count == 0);
 
+    ### ask user choose which GPDB to switch ###
+    ECHO_SYSTEM("please select which GPDB you would like to change to:");
+    my $input = (<STDIN>);
+
+    while (1)
+    {
+        if ($hash->{$input})
+        {
+            $gp_target = $hash->{$input};
+            ECHO_SYSTEM("Target GPDB has choosen: [$hash->{$input}]");
+            return $hash->{$input};
+        }
+        else
+        {
+            ECHO_ERROR("Wrong input [$input], please try again");
+        }   
+    }
 }
 
 sub stop_gpdb
