@@ -263,7 +263,10 @@ sub set_env
         createdb $gp_user;
     ));
     
-    ### maybe adding some more jobs at here ###
+    ## remove the greenplum-db file and relink to target folder
+    ECHO_INFO("Relink the greenplum-db to [$gp_home]...");
+    run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
+    run_command(qq(ln -s $gp_home $gpdp_home_folder/greenplum-db));
 
     ECHO_SYSTEM("
 ###############################################################
