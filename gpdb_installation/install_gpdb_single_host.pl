@@ -108,8 +108,7 @@ sub install_gpdb_binary
     GPDB home folder:       $gp_home
     GPDB master folder:     $master_folder
     GPDB segment count:     $segment_count
-    GPDB segment folder:    $segment_folder
-");
+    GPDB segment folder:    $segment_folder");
 
     $gp_info->{'ver'} = $gp_ver;
     $gp_info->{'gp_home'} = $gp_home;
@@ -342,7 +341,7 @@ sub user_confirm
     }
     else
     {
-        ECHO_SYSTEM("$msg");
+        ECHO_SYSTEM("\n$msg");
         $input = (<STDIN>);
     }
 
