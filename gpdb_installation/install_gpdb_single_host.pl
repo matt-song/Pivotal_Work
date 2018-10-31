@@ -165,6 +165,9 @@ sub init_gpdb
     ECHO_INFO("Creating segment folder under [$segment_folder]...");
 
     my $count = 0;
+    my $conf_primary = "declare -a DATA_DIRECTORY=(";
+    my $conf_mirror = "declare -a MIRROR_DATA_DIRECTORY=(";
+
     while ( $count lt $gpdb_segment_num )
     {
         $count++;
@@ -185,7 +188,34 @@ sub init_gpdb
         run_command("mkdir -p $primary");
         run_command("mkdir -p $mirror");
         run_command("chown -R gpadmin $segment_folder");
+
+        $conf_primary = $conf_primary."$primary ";
+        $conf_mirror = $conf_mirror."$mirror ";
     }
+    $conf_primary = $conf_primary.")";
+    $conf_mirror = $conf_mirror.")";
+
+    ECHO_INFO("Successfully created master and segment folder.");
+    ECHO_DEBUG("conf file: [$conf_primary] and [$conf_mirror]");
+
+    ### initiate the gpdb server ###
+    my $gpinitsystem_config = qq(
+ARRAY_NAME="gpdb_${gp_ver}"
+SEG_PREFIX=gpdb_${gp_ver}_
+PORT_BASE=20000
+$conf_primary
+MASTER_HOSTNAME=$master_hostname
+MASTER_DIRECTORY=$master_folder
+MASTER_PORT=5432
+TRUSTED_SHELL=ssh
+CHECK_POINT_SEGMENTS=8
+ENCODING=UNICODE
+MIRROR_PORT_BASE=21000
+REPLICATION_PORT_BASE=22000
+MIRROR_REPLICATION_PORT_BASE=23000
+$conf_mirror
+);
+
 
 
 
@@ -193,15 +223,6 @@ sub init_gpdb
 
 =old
 
-[root@greenplum-aio][master]# mkdir -p /data/master/master_4.3.28.0; chown gpadmin /data/master/master_4.3.28.0
-[root@greenplum-aio][master]# ls -ld /data/master/master_4.3.28.0
-drwxr-xr-x. 2 gpadmin root 6 Oct 26 12:36 /data/master/master_4.3.28.0
-
-# mkdir -p /data/segment/4.3.28.0/{primary1,primary2,mirror1,mirror2}
-# chown -R gpadmin /data/segment/4.3.28.0
-
-# ls -ld /data/segment/4.3.28.0/
-drwxr-xr-x. 6 gpadmin root 68 Oct 26 12:39 /data/segment/4.3.28.0/
 
 $ cat gpinitsystem_config | egrep -v "^#|^$"
 ARRAY_NAME="gpdb_4.3.28.0"
@@ -219,7 +240,7 @@ REPLICATION_PORT_BASE=22000
 MIRROR_REPLICATION_PORT_BASE=23000
 declare -a MIRROR_DATA_DIRECTORY=(/data/segment/4.3.28.0/mirror1 /data/segment/4.3.28.0/mirror2)
 
-echo export MASTER_DATA_DIRECTORY='/data/master/master_4.3.25.1/gpdb_4.3.25.1_-1' >> gphomexxxxxx
+
 gpinitsystem -c gpinitsystem_config -h seg_hosts
 # createdb gpadmin
 
