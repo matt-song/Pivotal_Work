@@ -41,6 +41,9 @@ sub switch_gpdb
     if ($result->{'pid'})
     {
         ECHO_INFO("GPDB has started successfully, PID [$result->{'pid'}]");
+        ECHO_INFO("Reloading the greenplum_path.sh...");
+        run_command(qq (source "$result->{'gphome'}/greenplum_path.sh" ));
+        ECHO_INFO("All done, enjoy!");
     }
     else
     {
