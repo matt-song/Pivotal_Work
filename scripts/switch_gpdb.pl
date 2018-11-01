@@ -11,11 +11,11 @@ use Data::Dumper;
 my $gpdp_home_folder = "/opt";
 my $DEBUG = 0;
 
+ ### let user choose which version to start ###
+my $targer_gpdb = select_gpdb($gpdp_home_folder);
+
 ### stop GPDB if it is running ###
 &stop_gpdb;
-
-### let user choose which version to start ###
-my $targer_gpdb = select_gpdb($gpdp_home_folder);
 
 ### finally, switch the gpdb ###
 switch_gpdb($targer_gpdb);
