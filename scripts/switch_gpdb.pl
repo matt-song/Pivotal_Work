@@ -53,6 +53,16 @@ sub switch_gpdb
 
 sub select_gpdb
 {
+    
+    my $current_gpdb = &check_gpdb_isRunning();
+    if ($current_gpdb->{'pid'})
+    {
+        my $current_gp_ver = $current_gpdb->{'gphome'};
+        $current_gp_ver =~ s/\/opt\/greenplum_//g;
+        ECHO_SYSTEM("\n[WARNING] Detected GPDB is running, code version: [$current_gp_ver]");
+        user_confirm("Continue to swith GPDB build? [yes/no]");
+    }
+
     my $gp_list = run_command("ls $gpdp_home_folder | grep '^greenplum_'");
     my $gp_target;
 
