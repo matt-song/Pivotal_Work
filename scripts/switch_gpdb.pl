@@ -229,7 +229,7 @@ sub ECHO_ERROR
     printColor('red',"[ERROR] $Message"."\n");
     if ($ErrorOut == 1)
     { 
-        working_folder("clear");
+        #working_folder("clear");
         exit(1);
     }
     else{return 1;}
