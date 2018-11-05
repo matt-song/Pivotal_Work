@@ -80,10 +80,10 @@ sub extract_binary
     run_command(qq(unzip -qo $package -d $working_folder));
 
     #(my $binary = $package) =~ s/\.zip/\.bin/g;
-    my $binary = run_command(qq(ls $working_folder | grep bin));
-    ECHO_INFO("Successfully extracted binary [$binary]");    
+    my $result = run_command(qq(ls $working_folder | grep bin));
+    ECHO_INFO("Successfully extracted binary [$result->{'output'}]");    
 
-    return $binary;
+    return $result->{'output'};
 }
 
 sub install_gpdb_binary
@@ -122,8 +122,8 @@ sub install_gpdb_binary
     }
 
     ECHO_INFO("Installing GPDB package to [$gp_home]...");
-    my $rc = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
-    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
+    my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
+    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
 
     ### adding the host list into GPDB home folder ###
     ECHO_INFO("Adding host list into [${gp_home}]...");
@@ -225,13 +225,13 @@ $conf_mirror
     print INIT "$gpinitsystem_config";
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
-    my $rc = run_command(qq (
+    my $result = run_command(qq (
         source ${gp_home}/greenplum_path.sh; 
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     
     ### verify if the newly installed GPDB has started ###
-    if ($rc)
+    if ($result->{'code'})
     {
         ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1);
     }
@@ -367,8 +367,8 @@ sub check_gpdb_isRunning
     my $result;
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
-    my ($pid,$gphome) = split(/,/,$gpdb_proc);
+    my $result = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
@@ -390,21 +390,26 @@ sub check_gpdb_isRunning
 sub run_command
 {
     my $cmd = shift;
+    my $run_info;
+
     ECHO_DEBUG("will run command [$cmd]..");
     chomp(my $result = `$cmd 2>&1` );
     my $rc = "$?";
+    $run_info->{'code'} = $rc;
+    $run_info->{'output'} = $result;
+    
     if ($rc)
     {
         ECHO_ERROR("Failed to excute command [$cmd], return code is $rc"); 
         ECHO_ERROR("ERROR: [$result]");
-        return $rc;
     }
     else
     {
-        ECHO_DEBUG("Command excute successfully, return code [$rc]");
-        ECHO_DEBUG("the result is [$result]");
-        return $result;        
+        ECHO_DEBUG("Command excute successfully, return code is [$rc]");
+        ECHO_DEBUG("The result is [$result]");   
     }
+    return $run_info;
+
 }
 
 ### define function to make the world more beautiful ###
