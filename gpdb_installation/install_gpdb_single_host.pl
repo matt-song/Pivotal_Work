@@ -227,7 +227,7 @@ $conf_mirror
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
     my $rc = run_command(qq (
         source ${gp_home}/greenplum_path.sh; 
-        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep 'WARNING|ERROR'
+        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     
     ### verify if the newly installed GPDB has started ###
