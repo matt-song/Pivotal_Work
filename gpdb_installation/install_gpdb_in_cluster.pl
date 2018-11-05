@@ -94,7 +94,7 @@ sub extract_binary
     run_command(qq(unzip -qo $package -d $working_folder));
 
     #(my $binary = $package) =~ s/\.zip/\.bin/g;
-    my $binary = run_command(qq(ls $working_folder | grep bin));
+    my $binary = run_command(qq(ls $working_folder | grep "bin$" ));
     ECHO_INFO("Successfully extracted binary [$binary]");    
 
     return $binary;
