@@ -77,13 +77,13 @@ sub extract_binary
     ECHO_ERROR("Unable to locate file [$package], run [# $0 -h] to check the usage of the script!",1) if ( ! -f $package); 
 
     ECHO_INFO("Extracting GPDB package [$package] into [$working_folder]...");
-    run_command(qq(unzip -qo $package -d $working_folder));
+    run_command(qq(unzip -qo $package -d $working_folder),1);
+    
+    my $result = run_command(qq(ls $working_folder | grep "bin\$"),1);
+    my $binary = $result->{'output'};
+    ECHO_INFO("Successfully extracted binary [$binary]");    
 
-    #(my $binary = $package) =~ s/\.zip/\.bin/g;
-    my $result = run_command(qq(ls $working_folder | grep "bin\$"));
-    ECHO_INFO("Successfully extracted binary [$result->{'output'}]");    
-
-    return $result->{'output'};
+    return $binary;
 }
 
 sub install_gpdb_binary
@@ -389,24 +389,27 @@ sub check_gpdb_isRunning
 
 sub run_command
 {
-    my $cmd = shift;
+    my ($cmd, $err_out) = @_;
     my $run_info;
+    $run_info->{'cmd'} = $cmd;
 
     ECHO_DEBUG("will run command [$cmd]..");
     chomp(my $result = `$cmd 2>&1` );
     my $rc = "$?";
+    ECHO_DEBUG("Return code [$rc], Result is [$result]");
+    
     $run_info->{'code'} = $rc;
     $run_info->{'output'} = $result;
-    
+
     if ($rc)
     {
         ECHO_ERROR("Failed to excute command [$cmd], return code is $rc"); 
-        ECHO_ERROR("ERROR: [$result]");
+        ECHO_ERROR("ERROR: [$run_info->{'output'}]", $err_out);
     }
     else
     {
         ECHO_DEBUG("Command excute successfully, return code is [$rc]");
-        ECHO_DEBUG("The result is [$result]");   
+        ECHO_DEBUG("The result is [$run_info->{'output'}]");   
     }
     return $run_info;
 
