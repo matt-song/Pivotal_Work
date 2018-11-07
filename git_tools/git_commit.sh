@@ -1,7 +1,7 @@
 #!/bin/bash
 
 msg=$1;
-msg+=","
+[ x"$msg" != x ] && msg+=","
 DATE_NOW=`date +%F`
 
 cd ~/git_repository/pv_work
