@@ -2,7 +2,7 @@
 #################################################################
 # Author:      Matt Song                                        #
 # Create Date: 2018.11.07                                       #
-# Description: generate the DDL based on \d+ output from GPDB  #
+# Description: generate the DDL based on \d+ output from GPDB   #
 #################################################################
 IFS=$'\n'
 output='';
