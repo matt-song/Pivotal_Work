@@ -146,7 +146,7 @@ sub stop_gpdb
                 else
                 {
                     ECHO_ERROR("Failed to stop GPDB, will try again.. [$retry / $max_retry]");
-                    last;
+                    next;
                 }
 
             }
