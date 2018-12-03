@@ -1,0 +1,28 @@
+alias vi='vim'
+
+## color variables
+green="\[\e[1;32m\]"
+red="\[\e[1;31m\]"
+yellow="\[\e[1;33m\]"
+normal="\[\e[0m\]"
+
+##PS1 output
+PS1="[$red\u@$green\h$yellow$normal][\W]\\\$ "
+
+alias sshsmdw='ssh root@10.152.9.3'
+alias hawq2='ssh root@10.152.9.21'
+alias sshlab='ssh gpadmin@10.193.94.7'
+alias gp='bash ~/scripts/connect_server.sh'
+alias list='~/scripts/get_host_list.sh'
+alias ll='ls -lG'
+alias c='bash ~/scripts/run_c_program.sh'
+alias sf='perl ~/scripts/update_case.pl -t template'
+alias case_finder='perl ~/scripts/update_case.pl -t find -c'
+
+PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
+PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
+PERL_LOCAL_LIB_ROOT="/Users/xsong/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
+PERL_MB_OPT="--install_base \"/Users/xsong/perl5\""; export PERL_MB_OPT;
+PERL_MM_OPT="INSTALL_BASE=/Users/xsong/perl5"; export PERL_MM_OPT;
+
+export PATH=$PATH:~/scripts;
