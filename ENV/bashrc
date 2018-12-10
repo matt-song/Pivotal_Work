@@ -16,8 +16,12 @@ alias gp='bash ~/scripts/connect_server.sh'
 alias list='~/scripts/get_host_list.sh'
 alias ll='ls -lG'
 alias c='bash ~/scripts/run_c_program.sh'
+
+### case management ###
 alias sf='perl ~/scripts/update_case.pl -t template'
 alias case_finder='perl ~/scripts/update_case.pl -t find -c'
+alias ir='perl /Users/xsong/scripts/update_case.pl -t ir -l'
+alias ircn='perl /Users/xsong/scripts/update_case.pl -t ir -l cn'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
