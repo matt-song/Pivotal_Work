@@ -29,6 +29,14 @@ elsif ($task =~ /ir/i)
 {
     generate_ir($lang);
 }
+elsif ($task =~ /eogs/i)
+{
+    generate_eogs_template();
+}
+elsif ($task =~ /log/i)
+{
+    generate_ask_log_template($case_to_check);
+}
 else
 {
     &print_help;
@@ -45,6 +53,8 @@ sub print_help
     $0 -t template                      // generate case update template
     $0 -t find -c [case number]         // find the case update 
     $0 -t ir -l cn                      // generate IR message
+    $0 -t eogs                          // generate end of general support message
+    $0 -t log <-c log>                  // generate ask log message
 
     Suggested alias:
 
@@ -52,8 +62,31 @@ sub print_help
     alias case_finder='perl $0 -t find -c'
     alias ir='perl $0 -t ir -l'
     alias ircn='perl $0 -t ir -l cn'
+    alias eogs='perl $0 -t eogs'
+    alias logs='perl $0 -t log -c'
 \n";
     exit 1;
+}
+
+sub generate_ask_log_template
+{
+    my $case = shift;
+
+    print "Hi,\n
+Good day to you. Cloud you please help provide below info/files so we can check further?
+
+1. Please help collect the logs from master and problematic segment server, you may collect the logs via GPMT. Please check below KB for more reference:
+https://community.pivotal.io/s/article/How-gplogcollector-Automates-the-Collection-of-Pivotal-Greenplum-Logs
+
+2. Please check if we have any core file has been generated during the time segment crash. Please check below KB for more reference:
+https://community.pivotal.io/s/article/How-to-Collect-Core-Files-for-Analysis
+";
+
+    if ($case)
+    {
+        print "\nYou may upload the file to https://securefiles.pivotal.io/dropzone/customer-service/$case\n";
+    }
+    return 0;
 }
 
 sub generate_ir
@@ -94,6 +127,21 @@ Working Hours: Mon-Fri 8 AM to 5 PM GMT+8';
     return 0;
 }
 
+sub generate_eogs_template
+{
+    my $ver = shift;
+    print "
+We noticed that you opened this ticket under a version of GPDB that has been removed from General support. General Support for GPDB version [$ver] ended at [date]
+Link: https://community.pivotal.io/s/article/Greenplum-Software-End-of-Life-Cycle-Policy 
+
+We recommend you to upgrade to Supported Version to resume getting regular support.
+
+Please let me know what your upgrade plans are.
+
+I’m putting this ticket handling on hold, awaiting your response”
+";
+    return 0;
+}
 sub find_case_update
 {
     my $case = shift;

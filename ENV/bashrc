@@ -22,6 +22,8 @@ alias sf='perl ~/scripts/update_case.pl -t template'
 alias case_finder='perl ~/scripts/update_case.pl -t find -c'
 alias ir='perl /Users/xsong/scripts/update_case.pl -t ir -l'
 alias ircn='perl /Users/xsong/scripts/update_case.pl -t ir -l cn'
+alias eogs='perl /Users/xsong/scripts/update_case.pl -t eogs'
+alias logs='perl /Users/xsong/scripts/update_case.pl -t log -c'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
