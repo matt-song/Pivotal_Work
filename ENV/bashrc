@@ -9,10 +9,8 @@ normal="\[\e[0m\]"
 ##PS1 output
 PS1="[$red\u@$green\h$yellow$normal][\W]\\\$ "
 
-alias sshsmdw='ssh root@10.152.9.3'
-alias hawq2='ssh root@10.152.9.21'
-alias sshlab='ssh gpadmin@10.193.94.7'
-alias gp='bash ~/scripts/connect_server.sh'
+alias gp='bash ~/scripts/connect_server.sh gpadmin'
+alias root='bash ~/scripts/connect_server.sh root'
 alias list='~/scripts/get_host_list.sh'
 alias ll='ls -lG'
 alias c='bash ~/scripts/run_c_program.sh'
@@ -24,6 +22,7 @@ alias ir='perl /Users/xsong/scripts/update_case.pl -t ir -l'
 alias ircn='perl /Users/xsong/scripts/update_case.pl -t ir -l cn'
 alias eogs='perl /Users/xsong/scripts/update_case.pl -t eogs'
 alias logs='perl /Users/xsong/scripts/update_case.pl -t log -c'
+alias clipboard='killall pboard'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
