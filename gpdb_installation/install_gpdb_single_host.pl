@@ -13,14 +13,10 @@ use Getopt::Std;
 use lib './lib';
 use GPDB;
 
-
-
 my %opts; getopts('hf:Dy', \%opts);
-
 my $DEBUG = $opts{'D'};   
 my $gpdb_bin = $opts{'f'};
 #my $ALL_YES = $opts{'y'};
-
 
 my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data/segment"; 
@@ -50,7 +46,6 @@ GPDB->set_env_single($gp_info);
 
 GPDB->working_folder("clear");
 
-
 sub print_help
 {
     my $err = shift;
@@ -58,7 +53,6 @@ sub print_help
     GPDB->ECHO_ERROR("$err",1) if ($err); 
     exit 1;
 }
-
 
 ### init the gpdb in single mode
 sub init_gpdb_single
@@ -164,8 +158,3 @@ $conf_mirror
         }
     }
 }
-
-
-
-
-

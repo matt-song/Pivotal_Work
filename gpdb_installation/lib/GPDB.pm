@@ -13,7 +13,6 @@ my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
 my $gp_user = 'gpadmin';
 
-
 ### GPDB installation related function ###
 
 sub working_folder
@@ -137,7 +136,6 @@ sub set_env_single
   # source $gp_home/greenplum_path.sh
   # psql 
 ");
-
 }
 
 sub user_confirm
@@ -156,7 +154,7 @@ sub user_confirm
 =cut
     ECHO_SYSTEM('self',"\n$msg");
     my $input = (<STDIN>);
-    
+
     if ($input =~ /no|n/i)
     {
         ECHO_ERROR('self',"Cancelled by user, exit!", 1);
@@ -234,7 +232,6 @@ sub run_command
     return $run_info;
 
 }
-
 
 sub stop_gpdb
 {
