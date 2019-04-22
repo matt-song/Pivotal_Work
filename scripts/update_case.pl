@@ -80,6 +80,9 @@ https://community.pivotal.io/s/article/How-gplogcollector-Automates-the-Collecti
 
 2. Please check if we have any core file has been generated during the time segment crash. Please check below KB for more reference:
 https://community.pivotal.io/s/article/How-to-Collect-Core-Files-for-Analysis
+
+3. Please collect the minirepro of the query
+https://community.pivotal.io/s/article/How-to-Collect-DDL-and-Statistics-Information-Using-the-Minirepro-Utility
 ";
 
     if ($case)
