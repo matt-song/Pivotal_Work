@@ -90,7 +90,7 @@ sub install_package_on_segment_server
         gpseginstall -f $host_file 2>&1 > /dev/null
     ));
 
-    print "install_package_on_segment_server: result is [$result]"
+    #print "install_package_on_segment_server: result is [$result]"
 
 }
 
