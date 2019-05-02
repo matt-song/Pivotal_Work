@@ -3,6 +3,9 @@
 # Author:      Matt Song                                        #
 # Create Date: 2018.10.31                                       #
 # Description: Switch the GPDB server to target build           #
+#                                                               #
+# Update @ 2019.05.02                                           #
+# Now we can run this tool on GPDB cluster :)                   #
 #################################################################
 use strict;
 use Term::ANSIColor;
