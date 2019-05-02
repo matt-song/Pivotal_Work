@@ -252,7 +252,7 @@ sub init_gpdb
     open INIT, '>', "$gp_home/gpinitsystem_config" or do {ECHO_ERROR("unable to write file [$gp_home/gpinitsystem_config], exit!",1)};
     my $gpinitsystem_config = qq(
 ARRAY_NAME="gpdb_${gp_ver}"
-SEG_PREFIX=gpdb_${gp_ver}_
+SEG_PREFIX=gpseg
 PORT_BASE=20000
 $conf_primary
 MASTER_HOSTNAME=$master_hostname
