@@ -1,8 +1,8 @@
 #!/usr/bin/perl
 #################################################################
 # Author:      Matt Song                                        #
-# Create Date: 2018.11.01                                       #
-# Description: Install GPDB in a cluster                        #
+# Create Date: 2019.05.02                                       #
+# Description: Install GPDB in cluster                          #
 #################################################################
 use strict;
 use Data::Dumper;
@@ -19,8 +19,8 @@ my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data/segment"; 
 my $gpdb_segment_num = 2;
-my $master_hostname = 'gp-mdw-p';                      ## master host
-my @segment_list = ('gp-sdw-01','gp-sdw-02');          ## segment hosts list
+my $master_hostname = 'mdw';                      ## master host
+my @segment_list = ('sdw1','sdw2');               ## segment hosts list
 my $gp_user = 'gpadmin';
 
 &print_help if $opts{'h'};
@@ -36,8 +36,8 @@ my $gpdb_binary = extract_binary("$gpdb_bin");
 ## Steo#3 install the binary to $gpdp_home_folder
 my $gp_info = install_gpdb_binary("$gpdb_binary");
 
-## step#4 syncing the binary to segment server
-sync_binary();
+## steo#4 distribute the package, suppose the ssh key has been synced ##
+install_package_on_segment_server($gp_info);
 
 ## Step#5 initialize the GPDB
 init_gpdb($gp_info);
@@ -47,17 +47,52 @@ set_env($gp_info);
 
 working_folder("clear");
 
-
-sub sync_binary
+sub check_folder_existed_and_remove
 {
-    # mkdir -p /data/segment/segment_5.10.2
-  #    897  cd /data/segment/segment_5.10.2
-#  898  pwd
-#  899  mkdir primary1 primary2 mirror1 mirror2
-# gpseginstall -f all_hosts
+    my ($folder,$isLocal) = @_;   ## 1 = on segment server, 0 = check master locally
+
+    if ($isLocal)
+    {
+        foreach my $server (@segment_list)
+        {
+            ECHO_DEBUG("Checking folder [$folder] on host [$server]...");
+            my $folder_is_exist = run_command(qq(ssh $server "ls -ld $folder 2>/dev/null | wc -l" ));
+            if ($folder_is_exist != 0)
+            {
+                user_confirm("Folder [$folder] on segment server [$server] already existed, remove it?");
+                run_command(qq(ssh $server "rm -rf $folder"));
+            }
+        }
+    }
+    else
+    {
+        user_confirm("Folder [$folder] on master server already existed, remove it?");
+        run_command("rm -rf $folder");
+    }
+
 }
 
 
+sub install_package_on_segment_server
+{
+    my $gp_info = shift;
+    my $gp_home = $gp_info->{'gp_home'};
+    my $host_file = "${gp_home}/all_hosts"; 
+
+    ECHO_INFO("Cleaning folder [$gp_home] on segment servers...");
+
+    ### check if the segment server already have package installed ###
+    check_folder_existed_and_remove($gp_home,1);
+
+    ECHO_INFO("Distributing package to all segment server...");
+    my $result = run_command(qq (
+        source ${gp_home}/greenplum_path.sh; 
+        gpseginstall -f $host_file 2>&1 > /dev/null
+    ));
+
+    print "install_package_on_segment_server: result is [$result]"
+
+}
 
 sub print_help
 {
@@ -91,10 +126,10 @@ sub extract_binary
     ECHO_ERROR("Unable to locate file [$package], run [# $0 -h] to check the usage of the script!",1) if ( ! -f $package); 
 
     ECHO_INFO("Extracting GPDB package [$package] into [$working_folder]...");
-    run_command(qq(unzip -qo $package -d $working_folder));
-
-    #(my $binary = $package) =~ s/\.zip/\.bin/g;
-    my $binary = run_command(qq(ls $working_folder | grep bin | grep -v  ));
+    run_command(qq(unzip -qo $package -d $working_folder),1);
+    
+    my $result = run_command(qq(ls $working_folder | grep "bin\$"),1);
+    my $binary = $result->{'output'};
     ECHO_INFO("Successfully extracted binary [$binary]");    
 
     return $binary;
@@ -129,15 +164,11 @@ sub install_gpdb_binary
 
     &user_confirm("Do you want to continue the installation? [yes/no]");
 
-    if ( -d $gp_home )
-    {
-        &user_confirm("GP home folder [$gp_home] already existed, remove it? [yes/no]");
-        run_command("rm -rf $gp_home");
-    }
+    check_folder_existed_and_remove($gp_home,0);
 
     ECHO_INFO("Installing GPDB package to [$gp_home]...");
-    my $rc = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
-    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($rc);
+    my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
+    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
 
     ### adding the host list into GPDB home folder ###
     ECHO_INFO("Adding host list into [${gp_home}]...");
@@ -145,8 +176,9 @@ sub install_gpdb_binary
     open SEG_HOSTS,'>',"${gp_home}/seg_hosts" or do {ECHO_ERROR("unable to write file [${gp_home}/seg_hosts], exit!",1)};
 
     print SEG_HOSTS "$_\n" foreach (@segment_list);
-    push(@segment_list, $master_hostname);
-    print ALL_HOSTS "$_\n" foreach (@segment_list);
+    my @all_segment = @segment_list;
+    push(@all_segment, $master_hostname);
+    print ALL_HOSTS "$_\n" foreach (@all_segment);
     close ALL_HOSTS; close SEG_HOSTS;
 
     ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
@@ -166,7 +198,7 @@ sub init_gpdb
     my $gp_ver = $gp_info->{'ver'};
     my $gp_home = $gp_info->{'gp_home'};
 
-    ECHO_ERROR("No GPDB version got, exit!") if (! $gp_ver);
+    ECHO_ERROR("No GPDB version found, exit!") if (! $gp_ver);
     
     ECHO_INFO("Start to initializing the GPDB");
 
@@ -174,20 +206,15 @@ sub init_gpdb
     my $master_folder = "${gpdb_master_home}/master_${gp_ver}";
     ECHO_INFO("Creating the master folder [$master_folder]...");
 
-    if (-d $master_folder)
-    {
-        user_confirm("Master folder [$master_folder] already existed, remove it?");
-        run_command("rm -rf $master_folder");
-    }
+    check_folder_existed_and_remove($master_folder,0);
     run_command("mkdir -p $master_folder; chown gpadmin $master_folder");
 
     ### create segment folder ###
     my $segment_folder = "${gpdb_segment_home}/segment_${gp_ver}";
-    if (-d $segment_folder)
-    {
-        user_confirm("Segment folder [$segment_folder] already existed, remove it?");
-        run_command("rm -rf $segment_folder");
-    }
+    
+    ### scan each segment server to see if segment folder was existed ###
+    check_folder_existed_and_remove($segment_folder,1);
+
     ECHO_INFO("Creating segment folder under [$segment_folder]...");
 
     my $count = 0;
@@ -201,11 +228,15 @@ sub init_gpdb
         my $primary = "$segment_folder/primary${count}";
         my $mirror = "$segment_folder/mirror${count}";
 
-        ECHO_DEBUG("Creating segment folder [$primary] and [$mirror]");
+        ### Create segment folder on each segment server ###
+        foreach my $seg_server (@segment_list)
+        {
+            ECHO_DEBUG("Creating segment folder [$primary] and [$mirror] on server [$seg_server]");
 
-        run_command("mkdir -p $primary");
-        run_command("mkdir -p $mirror");
-        run_command("chown -R gpadmin $segment_folder");
+            run_command(qq(ssh $seg_server "mkdir -p $primary"));
+            run_command(qq(ssh $seg_server "mkdir -p $mirror"));
+            run_command(qq(ssh $seg_server "chown -R gpadmin $segment_folder"));
+        }
 
         $conf_primary = $conf_primary."$primary ";
         $conf_mirror = $conf_mirror."$mirror ";
@@ -239,13 +270,13 @@ $conf_mirror
     print INIT "$gpinitsystem_config";
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
-    my $rc = run_command(qq (
+    my $result = run_command(qq (
         source ${gp_home}/greenplum_path.sh; 
-        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep 'WARNING|ERROR'
+        gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     
     ### verify if the newly installed GPDB has started ###
-    if ($rc)
+    if ($result->{'code'})
     {
         ECHO_ERROR("Failed to initialize GPDB, please check the error and try again",1);
     }
@@ -281,6 +312,13 @@ sub set_env
     ECHO_INFO("Relink the greenplum-db to [$gp_home]...");
     run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
     run_command(qq(ln -s $gp_home $gpdp_home_folder/greenplum-db));
+
+    foreach my $server (@segment_list)
+    {
+        ECHO_INFO("Relink the greenplum-db to [$gp_home] on segment [$server]...");
+        run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db" )) ;
+        run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
+    }
 
     ECHO_SYSTEM("
 ###############################################################
@@ -381,8 +419,8 @@ sub check_gpdb_isRunning
     my $result;
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
-    my ($pid,$gphome) = split(/,/,$gpdb_proc);
+    my $result = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
@@ -403,22 +441,30 @@ sub check_gpdb_isRunning
 
 sub run_command
 {
-    my $cmd = shift;
+    my ($cmd, $err_out) = @_;
+    my $run_info;
+    $run_info->{'cmd'} = $cmd;
+
     ECHO_DEBUG("will run command [$cmd]..");
     chomp(my $result = `$cmd 2>&1` );
     my $rc = "$?";
+    ECHO_DEBUG("Return code [$rc], Result is [$result]");
+    
+    $run_info->{'code'} = $rc;
+    $run_info->{'output'} = $result;
+
     if ($rc)
     {
         ECHO_ERROR("Failed to excute command [$cmd], return code is $rc"); 
-        ECHO_ERROR("ERROR: [$result]");
-        return $rc;
+        ECHO_ERROR("ERROR: [$run_info->{'output'}]", $err_out);
     }
     else
     {
-        ECHO_DEBUG("Command excute successfully, return code [$rc]");
-        ECHO_DEBUG("the result is [$result]");
-        return $result;        
+        ECHO_DEBUG("Command excute successfully, return code is [$rc]");
+        ECHO_DEBUG("The result is [$run_info->{'output'}]");   
     }
+    return $run_info;
+
 }
 
 ### define function to make the world more beautiful ###
