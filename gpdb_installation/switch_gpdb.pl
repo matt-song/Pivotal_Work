@@ -10,7 +10,7 @@ use Data::Dumper;
 
 my $gpdp_home_folder = "/opt";
 my $DEBUG = 0;
-my $SEG_HOST_LIST="/home/gpadmin/all_hosts.txt"
+my $HOST_LIST="/home/gpadmin/all_hosts.txt";
 
  ### let user choose which version to start ###
 my $targer_gpdb = select_gpdb($gpdp_home_folder);
@@ -28,8 +28,11 @@ sub switch_gpdb
     my $greenplum_path = "$gp_folder/greenplum_path.sh";
 
     ## remove the greenplum-db file and relink to target folder
-    foreach my $server (split('^',$SEG_HOST_LIST))
+    open LIST,$HOST_LIST or die "Unable to read the list [$HOST_LIST], exit!";
+
+    while (<LIST>)
     {
+        chomp(my $server = $_);
         ECHO_INFO("Relink the greenplum-db to [$gp_folder] on host [$server]...");
         my $link_file = "$gpdp_home_folder/greenplum-db";
 
