@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ~/git_repository/pv_work
+cd ~/Pivotal_Work
 
 git fetch origin
 git checkout
