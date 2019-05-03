@@ -1,10 +1,27 @@
 #!/usr/bin/perl
-#################################################################
-# Author:      Matt Song                                        #
-# Create Date: 2019.05.02                                       #
-# Description: Install GPDB in cluster                          #
-#              special designed for smdw                        #
-#################################################################
+###########################################################################################
+# Author:      Matt Song                                                                  #
+# Create Date: 2019.05.02                                                                 #
+# Description: Install GPDB in cluster, special designed for smdw                         #
+#                                                                                         #
+# Some notes here:                                                                        #
+#                                                                                         #
+# - PGPORT generate basd on md5 of gp version, for example:                               #
+#   echo `echo "5.17.0" | md5sum | awk '{print $1}' | tr a-f A-F ` % 9999 | bc            #
+#                                                                                         #
+# - All other port based on the master port                                               #
+#                                                                                         #
+# - No need to create greenplum-db link for GPHOME, set the value under greenplum-path.sh #
+#                                                                                         #
+# - dump for gp_info:                                                                     #
+#                                                                                         #
+#     $VAR1 = {                                                                           #
+#               'gp_port' => '2066',                                                      #
+#               'ver' => '5.16.0',                                                        #
+#               'gp_home' => '/opt/greenplum_5.16.0'                                      #
+#             };                                                                          #
+#                                                                                         #
+###########################################################################################
 use strict;
 use Data::Dumper;
 use Term::ANSIColor;
@@ -19,9 +36,9 @@ my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data1/segment";   ### TBD: distribute the segment across /data1 and /data2
-my $gpdb_segment_num = 4;                   ### currently only support < 10, will optimize here later
-my $master_hostname = 'smdw';                                                        ## master host
-my @segment_list = ('sdw1','sdw2','sdw3','sdw4','sdw5','sdw6');               ## segment hosts list
+my $gpdb_segment_num = 4;                   
+my $master_hostname = 'smdw';                                                          ## master host
+my @segment_list = ('sdw1','sdw2','sdw3','sdw4','sdw5','sdw6');                 ## segment hosts list
 my $gp_user = 'gpadmin';
 
 &print_help if $opts{'h'};
@@ -58,7 +75,7 @@ sub check_folder_existed_and_remove
         {
             ECHO_DEBUG("Checking folder [$folder] on host [$server]...");
             my $folder_is_exist = run_command(qq(ssh $server "ls -ld $folder 2>/dev/null | wc -l" ));
-            if ($folder_is_exist->{'result'} ne '0' )
+            if ($folder_is_exist->{'output'} ne '0' )
             {
                 user_confirm("Folder [$folder] on segment server [$server] already existed, remove it?");
                 run_command(qq(ssh $server "rm -rf $folder"));
@@ -68,7 +85,7 @@ sub check_folder_existed_and_remove
     else
     {
         my $folder_is_exist = run_command(qq(ls -ld $folder 2>/dev/null | wc -l ));
-        if ($folder_is_exist->{'result'} ne '0' )
+        if ($folder_is_exist->{'output'} ne '0' )
         {
             user_confirm("Folder [$folder] on master server already existed, remove it?");
             run_command("rm -rf $folder");
@@ -143,9 +160,8 @@ sub install_gpdb_binary
     my $binary = shift;
     my $gp_info;
 
-    # TBD, only stop the current build of GPDB
-    #ECHO_DEBUG("Checking if GPDB is running");
-    #&stop_gpdb;
+    ECHO_DEBUG("Checking if GPDB is running");
+    &stop_gpdb;
 
     ### print the settings and ask user to confirm ###
     ECHO_INFO("Will start to install binary [$binary], please review below setting");
@@ -156,15 +172,38 @@ sub install_gpdb_binary
     my $segment_count = $gpdb_segment_num;
     my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
 
+    ### Generate master port based on GP version ###
+    ECHO_DEBUG("Trying to get the port number based on GP version...");
+    my $gp_port_cmd = run_command(qq(echo `echo "$gp_ver" | md5sum | awk '{print \$1}' | tr a-f A-F ` % 9999 | bc)); 
+    my $gp_port = $gp_port_cmd->{'output'}; 
+    ECHO_DEBUG("calculated port number: [$gp_port]");
+    my $length = length("$gp_port");
+    ECHO_DEBUG("The length of port is [$length]");
+    if  (( $length <= 4) && ( $length  > 0 ))
+    {
+        my $count = 4 - $length;
+        foreach my $i (1..$count)
+        {
+            $gp_port_cmd .= '0';
+        }
+    }
+    else
+    {
+        ECHO_ERROR("Found invalid port number [$gp_port], exit!",1);
+    }
+
     ECHO_SYSTEM("
     GPDB Version:           $gp_ver
-    GPDB home folder:       $gp_home
-    GPDB master folder:     $master_folder
-    GPDB segment count:     $segment_count
-    GPDB segment folder:    $segment_folder");
+    GPDB Home Folder:       $gp_home
+    GPDB Master Folder:     $master_folder
+    GPDB Segment Count:     $segment_count
+    GPDB Segment Folder:    $segment_folder
+    GPDB Master Port:       $gp_port
+");
 
     $gp_info->{'ver'} = $gp_ver;
     $gp_info->{'gp_home'} = $gp_home;
+    $gp_info->{'gp_port'} = $gp_port;
 
     &user_confirm("Do you want to continue the installation? [yes/no]");
 
@@ -185,14 +224,19 @@ sub install_gpdb_binary
     print ALL_HOSTS "$_\n" foreach (@all_segment);
     close ALL_HOSTS; close SEG_HOSTS;
 
-    ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
+    ### adding environment settings to greenplum_path.sh
     ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
-    my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
-    print GP_PATH "$line\n";
+    
+    my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1'\n);
+    my $LINE_PGPORT = qq(export PGPORT=$gp_port\n);
+    my $LINE_GPHOME = qq(export GPHOME=$gp_home\n);
+
+    print GP_PATH "$LINE_MASTER_DATA_DIRECTORY"."$LINE_PGPORT"."$LINE_GPHOME";
     close GP_PATH;
    
     ECHO_INFO("GPDB binary has been successfully installed to [$gp_home]");
+    # print Dumper $gp_info;
     return $gp_info;
 }
 
@@ -252,11 +296,11 @@ sub init_gpdb
     ECHO_DEBUG("conf file: [$conf_primary] and [$conf_mirror]");
    
     ### in smdw we enable multiple build in cluder, so assign port based on version. 
-    (my $master_port = $gp_ver) =~ s/\.//g;         # for example GP5.17.0 will have master port 5170
-    my $sergment_port_base = "2${master_port}";     # for example GP5.17.0 will have port 25170
-    my $mirror_port_base = "3${master_port}";       # Same as above
-    my $replication_port_base = "4${master_port}";  # sane as above
-    my $mirror_replication_port_base = "5${master_port}";  # sane as above
+    my $master_port = $gp_info->{'gp_port'};           
+    my $sergment_port_base = "2${master_port}";     
+    my $mirror_port_base = "3${master_port}";       
+    my $replication_port_base = "4${master_port}";  
+    my $mirror_replication_port_base = "5${master_port}";  
 
     ### initiate the gpdb server ###
     ECHO_INFO("Creating the gpinitsystem_config file to [$gp_home]..");
@@ -275,8 +319,8 @@ ENCODING=UNICODE
 MIRROR_PORT_BASE=$mirror_port_base
 REPLICATION_PORT_BASE=$replication_port_base
 MIRROR_REPLICATION_PORT_BASE=$mirror_replication_port_base
-$conf_mirror
-);
+$conf_mirror);
+
     ECHO_DEBUG("the gpinitsystem_config file is like below [\n$gpinitsystem_config\n]");
     print INIT "$gpinitsystem_config";
 
@@ -294,7 +338,7 @@ $conf_mirror
     else
     {
         ECHO_INFO("Done! Checking if GPDB with [$gp_ver] has started");
-        my $result = &check_gpdb_isRunning;
+        my $result = &check_gpdb_isRunning($gp_info);
         if ($result->{'pid'})
         {
             ECHO_INFO("GPDB has been initialized and started successfully, PID [$result->{'pid'}]");
@@ -396,6 +440,7 @@ sub stop_gpdb
         }
     }
 }
+
 sub user_confirm
 {
     my $msg = shift;
@@ -427,14 +472,18 @@ sub user_confirm
 }
 sub check_gpdb_isRunning
 {
+    my $config = shift;
     my $result;
+
+    my $port = $config->{'gp_port'};
+    my $ver = $config->{'ver'};
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $result = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    my $result = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | grep greenplum_$ver | grep $port | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
-
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
+    
     if ($pid =~ /\d+/) ## GPDB is running
     {
         ECHO_INFO("GPDB is running, PID: [$pid], GPHOME: [$gphome]");
