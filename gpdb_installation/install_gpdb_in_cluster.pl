@@ -66,10 +66,13 @@ sub check_folder_existed_and_remove
     }
     else
     {
-        user_confirm("Folder [$folder] on master server already existed, remove it?");
-        run_command("rm -rf $folder");
+        my $folder_is_exist = run_command(qq(ls -ld $folder 2>/dev/null | wc -l" ));
+        if ($folder_is_exist->{'code'} != 0 )
+        {
+            user_confirm("Folder [$folder] on master server already existed, remove it?");
+            run_command("rm -rf $folder");
+        }
     }
-
 }
 
 
