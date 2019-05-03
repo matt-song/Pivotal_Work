@@ -57,7 +57,7 @@ sub check_folder_existed_and_remove
         {
             ECHO_DEBUG("Checking folder [$folder] on host [$server]...");
             my $folder_is_exist = run_command(qq(ssh $server "ls -ld $folder 2>/dev/null | wc -l" ));
-            if ($folder_is_exist != 0)
+            if ($folder_is_exist->{'code'} != 0)
             {
                 user_confirm("Folder [$folder] on segment server [$server] already existed, remove it?");
                 run_command(qq(ssh $server "rm -rf $folder"));
