@@ -57,7 +57,7 @@ sub check_folder_existed_and_remove
         {
             ECHO_DEBUG("Checking folder [$folder] on host [$server]...");
             my $folder_is_exist = run_command(qq(ssh $server "ls -ld $folder 2>/dev/null | wc -l" ));
-            if ($folder_is_exist->{'result'} != 0)
+            if ($folder_is_exist->{'result'} ne '0')
             {
                 user_confirm("Folder [$folder] on segment server [$server] already existed, remove it?");
                 run_command(qq(ssh $server "rm -rf $folder"));
@@ -67,14 +67,13 @@ sub check_folder_existed_and_remove
     else
     {
         my $folder_is_exist = run_command(qq(ls -ld $folder 2>/dev/null | wc -l));
-        if ($folder_is_exist->{'result'} != 0 )
+        if ($folder_is_exist->{'result'} ne '0' )
         {
             user_confirm("Folder [$folder] on master server already existed, remove it?");
             run_command("rm -rf $folder");
         }
     }
 }
-
 
 sub install_package_on_segment_server
 {
