@@ -35,8 +35,8 @@ my $ALL_YES = $opts{'y'};
 my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
-my $gpdb_segment_home = "/data1/segment";   ### TBD: distribute the segment across /data1 and /data2
-my $gpdb_segment_num = 4;                   
+# $gpdb_segment_home = "/data1/segment";  ### the segmnet folder will be defined in install_gpdb_binary
+my $gpdb_segment_num = 2;                   
 my $master_hostname = 'smdw';                                                          ## master host
 my @segment_list = ('sdw1','sdw2','sdw3','sdw4','sdw5','sdw6');                 ## segment hosts list
 my $gp_user = 'gpadmin';
@@ -160,9 +160,6 @@ sub install_gpdb_binary
     my $binary = shift;
     my $gp_info;
 
-    ECHO_DEBUG("Checking if GPDB is running");
-    &stop_gpdb;
-
     ### print the settings and ask user to confirm ###
     ECHO_INFO("Will start to install binary [$binary], please review below setting");
     
@@ -170,7 +167,7 @@ sub install_gpdb_binary
     my $gp_home = "${gpdp_home_folder}/greenplum_${gp_ver}";
     my $master_folder = "$gpdb_master_home/master_${gp_ver}";
     my $segment_count = $gpdb_segment_num;
-    my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
+    #my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
 
     ### Generate master port based on GP version ###
     ECHO_DEBUG("Trying to get the port number based on GP version...");
@@ -192,20 +189,28 @@ sub install_gpdb_binary
         ECHO_ERROR("Found invalid port number [$gp_port], exit!",1);
     }
 
+    ### choose to useing /data1 or /data2 based on port % 2 + 1 (e.g. 1 or 2) ###
+    my $folder_id_cmd = run_command(qq(echo $gp_port % 2 + 1| bc)); 
+    my $folder_id = $folder_id_cmd->{'output'};
+    my $segment_data_folder = "/data${folder_id}/segment";
+
     ECHO_SYSTEM("
-    GPDB Version:           $gp_ver
-    GPDB Home Folder:       $gp_home
-    GPDB Master Folder:     $master_folder
-    GPDB Segment Count:     $segment_count
-    GPDB Segment Folder:    $segment_folder
-    GPDB Master Port:       $gp_port
-");
+    GPDB Version:               $gp_ver
+    GPDB Home Folder:           $gp_home
+    GPDB Master Folder:         $master_folder
+    GPDB Segment Count:         $segment_count
+    GPDB Segment Folder:        ${segment_data_folder}/segment_${gp_ver}
+    GPDB Master Port:           $gp_port");
 
     $gp_info->{'ver'} = $gp_ver;
     $gp_info->{'gp_home'} = $gp_home;
     $gp_info->{'gp_port'} = $gp_port;
+    $gp_info->{'segment_data_folder'} = $segment_data_folder;
 
     &user_confirm("Do you want to continue the installation? [yes/no]");
+
+    ### Checking if GPDB is running 
+    &stop_gpdb($gp_info);
 
     check_folder_existed_and_remove($gp_home,0);
 
@@ -258,7 +263,7 @@ sub init_gpdb
     run_command("mkdir -p $master_folder; chown gpadmin $master_folder");
 
     ### create segment folder ###
-    my $segment_folder = "${gpdb_segment_home}/segment_${gp_ver}";
+    my $segment_folder = "$gp_info->{'segment_data_folder'}/segment_${gp_ver}";
     
     ### scan each segment server to see if segment folder was existed ###
     check_folder_existed_and_remove($segment_folder,1);
@@ -356,13 +361,17 @@ sub set_env
 
     my $gp_home = $gp_info->{'gp_home'};
 
+
+    ###### no need to create link here #####
+
     ### create the the DB for GP user ###
     ECHO_INFO("Creating database for [$gp_user]...");
     run_command(qq(
         source $gp_home/greenplum_path.sh;
         createdb $gp_user;
     ));
-    
+
+=old    
     ## remove the greenplum-db file and relink to target folder
     ECHO_INFO("Relink the greenplum-db to [$gp_home]...");
     run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
@@ -374,6 +383,7 @@ sub set_env
         run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db" )) ;
         run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
     }
+=cut
 
     ECHO_SYSTEM("
 ###############################################################
@@ -388,7 +398,9 @@ sub set_env
 
 sub stop_gpdb
 {
-    my $checking_result = &check_gpdb_isRunning;
+    my $config=shift;
+        print Dumper $config;
+    my $checking_result = &check_gpdb_isRunning($config);
 
     if ($checking_result->{'pid'} == 0)
     {
@@ -417,7 +429,9 @@ sub stop_gpdb
             source $gphome/greenplum_path.sh;
             gpstop -M fast -a | egrep "WARNING|ERROR";) );
 
-            my $result = &check_gpdb_isRunning;
+            # sleep 3;
+            my $result = &check_gpdb_isRunning($config);
+            ECHO_DEBUG("The result of check_gpdb_isRunning is [$result]...");
 
             if ($result->{'pid'} == 0) ## successfully shutdown
             {
@@ -477,9 +491,10 @@ sub check_gpdb_isRunning
 
     my $port = $config->{'gp_port'};
     my $ver = $config->{'ver'};
+    my $gphome = $config->{'gp_home'};
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $result = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | grep greenplum_$ver | grep $port | awk '{print \$2","\$8}'));
+    my $result = run_command(qq(ps -ef | grep silent | grep -v grep | grep $gphome | grep $port | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");

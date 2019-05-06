@@ -17,7 +17,7 @@ do
     echo "Sync data from [$source_dir] to host [$host], target folder [$target_dir]..."
     
     ### make sure the host is alive
-    ping_result=`ping -c1 -W1  $host 2>/dev/null | grep "packets received" 2>/dev/null | awk '{print $4}'`
+    ping_result=`ping -c1 -W3  $host 2>/dev/null | grep "packets received" 2>/dev/null | awk '{print $4}'`
     if [ "x$ping_result" == 'x1' ]
     then
         rsync -av --delete --exclude=".git*" $source_dir gpadmin@${host}:$target_dir

@@ -6,9 +6,6 @@ GP_HOME="/opt"
 GP_DATA_MASTER="/data/master"
 GP_DATA_SEGMENT="/data/segment"
 
-hostname=`uname -n`
-[ "x$hostname" = 'xsmdw' ] && GP_DATA_SEGMENT='/data1/segment'
-
 clear
 echo -e "Getting the installed build under [$GP_HOME]:\n"
 
@@ -39,12 +36,22 @@ uninstallGPDB()
     master_data_folder="${GP_DATA_MASTER}/master_${gp_ver}"
     segment_data_folder="${GP_DATA_SEGMENT}/segment_${gp_ver}"
 
+    ### special design for smdw ###
+    hostname=`uname -n`
+    if [ "x$hostname" = 'xsmdw' ] 
+    then 
+        port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `; port=`echo $port_md5_int % 9999 | bc`
+        data_id=`echo $port % 2 + 1 | bc`
+        segment_data_folder="/data${data_id}/segment/segment_${gp_ver}"
+    fi
+    ### end ###
+
     echo "Going to uninstall GPDB installed under [$gp_home]"
     echo "
 Below folder will be removed if exists:
 
-    ${gp_home} on master [$hostname]
     ${master_data_folder} on [$hostname]
+    ${gp_home} on all segment listed in [$SegmentList] 
     ${segment_data_folder} on all segment listed in [$SegmentList] 
 
 Please confirm if you would like to continue: [y/n]"
@@ -57,11 +64,13 @@ Please confirm if you would like to continue: [y/n]"
         #source $gp_home/greenplum_path.sh
         #gpstop -q -a -M fast
 
-        [ -d ${gp_home} ] && rm -rf $gp_home && echo "Removed [$gp_home]"
+        #[ -d ${gp_home} ] && rm -rf $gp_home && echo "Removed [$gp_home]"
         [ -d ${master_data_folder} ] && rm -rf $master_data_folder && echo "Removed [$master_data_folder]"
         for server in `cat $SegmentList`
         do
-            ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed $segment_data_folder on segment host [$server]\""
+            
+            ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed [$segment_data_folder] on segment host [$server]\""
+            ssh $server "[ -d ${gp_home} ] && rm -rf $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
             #echo "Removed $segment_data_folder on segment host [$server]"
         done
     else
