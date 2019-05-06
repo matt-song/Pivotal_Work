@@ -6,11 +6,29 @@ GP_HOME="/opt"
 GP_DATA_MASTER="/data/master"
 GP_DATA_SEGMENT="/data/segment"
 
+hostname=`uname -n`
+[ "x$hostname" = 'xsmdw' ] && GP_DATA_SEGMENT='/data1/segment'
+
+clear
 echo -e "Getting the installed build under [$GP_HOME]:\n"
 
 count=0
 declare -A GPDB_BUILD
 
+check_gpdb_running()
+{
+    build=$1
+    #gp_ver=`echo $build | sed 's/greenplum_//g'`
+    isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
+    if [ "x$isRunning" != 'x0' ]
+    then
+        echo "GPDB installed in [/opt/$build] is running! Pleaes stop the DB first, exit!"
+        echo "Command: source /opt/$build/greenplum_path.sh; gpstop -a -M fast"
+        exit
+    else
+        return 0
+    fi
+}
 
 uninstallGPDB()
 {
@@ -25,12 +43,12 @@ uninstallGPDB()
     echo "
 Below folder will be removed if exists:
 
-    ${gp_home}: 
-    ${master_data_folder}: 
-    ${segment_data_folder}: 
+    ${gp_home} on master [$hostname]
+    ${master_data_folder} on [$hostname]
+    ${segment_data_folder} on all segment listed in [$SegmentList] 
 
-Please confirm if you would like to continue: [y/n]
-"
+Please confirm if you would like to continue: [y/n]"
+
     read confirm
     if [ "x$confirm" = 'xy' ] || [ "x$confirm" = 'xyes' ] || [ "x$confirm" = 'xY' ] || [ "x$confirm" = 'xYes' ]
     then
@@ -43,8 +61,8 @@ Please confirm if you would like to continue: [y/n]
         [ -d ${master_data_folder} ] && rm -rf $master_data_folder && echo "Removed [$master_data_folder]"
         for server in `cat $SegmentList`
         do
-            ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder"
-            echo "Removed $segment_data_folder on segment host [$server]"
+            ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed $segment_data_folder on segment host [$server]\""
+            #echo "Removed $segment_data_folder on segment host [$server]"
         done
     else
         echo "Cancelled by user, exit.."
@@ -67,7 +85,7 @@ then
     echo "Unable to find build with input [$input], exit!"
     exit 1
 else
-    
+    check_gpdb_running $build_2_remove
     uninstallGPDB $build_2_remove
 fi
 
