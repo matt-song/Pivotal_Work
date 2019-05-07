@@ -263,7 +263,7 @@ export PYTHONPATH
 export PYTHONHOME
 export OPENSSL_CONF
 export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'
-export PGPORT=gp_port
+export PGPORT=$gp_port
 export GPHOME=$gp_home
 );
     close GP_PATH;

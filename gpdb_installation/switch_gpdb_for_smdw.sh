@@ -1,5 +1,5 @@
 #!/bin/bash
-# switch the gpdb build
+# switch the gpdb build on smdw
 
 SegmentList="/home/gpadmin/all_segment_hosts.txt"
 GP_HOME="/opt"
@@ -29,10 +29,11 @@ ECHO_ERROR()
 clear
 ECHO_SYSTEM "${green}Getting the installed build under [$GP_HOME]:\n${normal}"
 
-check_gpdb_running()
+switch_gpdb()
 {
     build=$1
-    #gp_ver=`echo $build | sed 's/greenplum_//g'`
+    gp_home=${GP_HOME}/${build}
+
     isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
     if [ "x$isRunning" == 'x0' ] 
     then
@@ -42,23 +43,15 @@ check_gpdb_running()
         then
             source /opt/$build/greenplum_path.sh; gpstart -a
         else
-            ECHO_WARN "Please use below command to start DB first if you would like to swith to [$build]"
-            ECHO_WARN "Command: \n# source /opt/$build/greenplum_path.sh \n# gpstart -a"
+            ECHO_WARN "Please use below command to start DB first if you would like to swith to [$build]\n"
+            ECHO_WARN "=== Command === \n# source /opt/$build/greenplum_path.sh \n# gpstart -a"
         fi
     else
-        return 0 ### GPDB is running, do nothing
+        ECHO_SYSTEM "Switching build to [$gp_home]..."
+        source ${GP_HOME}/${build}/greenplum_path.sh
+        ECHO_SYSTEM "Done :)" 
+        ### TBD: might need add some verification sql command to make sure the DB has been switched
     fi
-}
-
-switch_gpdb()
-{
-    build=$1
-    gp_home=${GP_HOME}/${build}
-
-    ECHO_SYSTEM "Switching build to [$gp_home]..."
-    source ${GP_HOME}/${build}/greenplum_path.sh
-    ECHO_SYSTEM "Done :)" 
-    ### TBD: might need add some verification sql command to make sure the DB has been switched
 }
 
 ### Start work here ###
@@ -81,7 +74,6 @@ if [ "x$target_build" = 'x' ]
 then
     ECHO_ERROR "Unable to find build with input [$input]!"
 else
-    check_gpdb_running $target_build
     switch_gpdb $target_build
 fi
 
