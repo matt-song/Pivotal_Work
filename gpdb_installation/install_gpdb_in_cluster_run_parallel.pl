@@ -110,6 +110,12 @@ sub install_package_on_segment_server
         gpseginstall -f $host_file 2>&1 > /dev/null
     ));
 
+    foreach my $server (@segment_list)
+    {
+        ECHO_INFO("Create the link greenplum-db in [$gp_home] on segment [$server]...");
+        run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db || exit 0" )) ;
+        run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
+    }
     #print "install_package_on_segment_server: result is [$result]"
 
 }
@@ -231,13 +237,35 @@ sub install_gpdb_binary
 
     ### adding environment settings to greenplum_path.sh
     ECHO_INFO("updating [greenplum_path.sh]...");
-    open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
+    open GP_PATH, '>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
     
-    my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'\n);
-    my $LINE_PGPORT = qq(export PGPORT=$gp_port\n);
-    my $LINE_GPHOME = qq(export GPHOME=$gp_home\n);
+    #my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'\n);
+    #my $LINE_PGPORT = qq(export PGPORT=$gp_port\n);
+    #my $LINE_GPHOME = qq(export GPHOME=$gp_home\n);
+    # print GP_PATH "$LINE_MASTER_DATA_DIRECTORY"."$LINE_PGPORT"."$LINE_GPHOME";
 
-    print GP_PATH "$LINE_MASTER_DATA_DIRECTORY"."$LINE_PGPORT"."$LINE_GPHOME";
+    print GP_PATH qq(
+GPHOME=$gp_home
+
+#setup PYTHONHOME
+if [ -x \$GPHOME/ext/python/bin/python ]; then
+    PYTHONHOME="\$GPHOME/ext/python"
+fi
+
+PYTHONPATH=\$GPHOME/lib/python
+PATH=\$GPHOME/bin:\$PYTHONHOME/bin:\$PATH
+LD_LIBRARY_PATH=\$GPHOME/lib:\$PYTHONHOME/lib:\$LD_LIBRARY_PATH
+OPENSSL_CONF=\$GPHOME/etc/openssl.cnf
+
+export PATH
+export LD_LIBRARY_PATH
+export PYTHONPATH
+export PYTHONHOME
+export OPENSSL_CONF
+export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'
+export PGPORT=gp_port
+export GPHOME=$gp_home
+);
     close GP_PATH;
    
     ECHO_INFO("GPDB binary has been successfully installed to [$gp_home]");
@@ -330,7 +358,7 @@ $conf_mirror);
     print INIT "$gpinitsystem_config";
 
     ### clear the pid file if existed ###
-    ECHO_SYSTEM("Clearing the old pid file under /tmp if existed...");
+    ECHO_INFO("Clearing the old pid file under /tmp if existed...");
     run_command(qq(rm -f /tmp/.s.PGSQL.${master_port} )) if ( -e "/tmp/.s.PGSQL.${master_port}");
     run_command(qq(rm -f /tmp/.s.PGSQL.${master_port}.lock )) if ( -e "/tmp/.s.PGSQL.${master_port}.lock");   
 
@@ -378,19 +406,19 @@ sub set_env
 
     ### remove the greenplum-db link
     run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
-
+    foreach my $server (@segment_list)
+    {
+        ECHO_INFO("Remove the greenplum-db in [$gp_home] on segment [$server]...");
+        run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db || exit 0" )) ;
+        #run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
+    }
 =old    
     ## remove the greenplum-db file and relink to target folder
     ECHO_INFO("Relink the greenplum-db to [$gp_home]...");
     run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
     run_command(qq(ln -s $gp_home $gpdp_home_folder/greenplum-db));
 
-    foreach my $server (@segment_list)
-    {
-        ECHO_INFO("Relink the greenplum-db to [$gp_home] on segment [$server]...");
-        run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db" )) ;
-        run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
-    }
+
 =cut
 
     ECHO_SYSTEM("
