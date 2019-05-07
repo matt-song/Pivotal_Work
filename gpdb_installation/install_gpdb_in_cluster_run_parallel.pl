@@ -230,7 +230,7 @@ sub install_gpdb_binary
     close ALL_HOSTS; close SEG_HOSTS;
 
     ### adding environment settings to greenplum_path.sh
-    ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
+    ECHO_INFO("updating [greenplum_path.sh]...");
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
     
     my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'\n);
@@ -329,6 +329,11 @@ $conf_mirror);
     ECHO_DEBUG("the gpinitsystem_config file is like below [\n$gpinitsystem_config\n]");
     print INIT "$gpinitsystem_config";
 
+    ### clear the pid file if existed ###
+    ECHO_SYSTEM("Clearing the old pid file under /tmp if existed...");
+    run_command(qq(rm -f /tmp/.s.PGSQL.${master_port} )) if ( -e "/tmp/.s.PGSQL.${master_port}");
+    run_command(qq(rm -f /tmp/.s.PGSQL.${master_port}.lock )) if ( -e "/tmp/.s.PGSQL.${master_port}.lock");   
+
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
     my $result = run_command(qq (
         source ${gp_home}/greenplum_path.sh; 
@@ -370,6 +375,9 @@ sub set_env
         source $gp_home/greenplum_path.sh;
         createdb $gp_user;
     ));
+
+    ### remove the greenplum-db link
+    run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
 
 =old    
     ## remove the greenplum-db file and relink to target folder

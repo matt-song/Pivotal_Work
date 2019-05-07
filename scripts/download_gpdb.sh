@@ -30,7 +30,7 @@ export tmpdir=$script_dir/tmp
 export wrkdir=/tmp/wrkdir.$$
 export prod_name="Pivotal Greenplum"
 export dldir="/data/package"
-export api_token="TvzDy4hwz8wwrwoUMysU"
+export api_token="2cq1tJV-ssR6H_tyvbTr"
 
 # Make working directory that will be used to store temporary files and 
 # this will be removed when the script ends.

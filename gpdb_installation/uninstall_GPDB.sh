@@ -64,7 +64,7 @@ Please confirm if you would like to continue: [y/n]"
         #source $gp_home/greenplum_path.sh
         #gpstop -q -a -M fast
 
-        #[ -d ${gp_home} ] && rm -rf $gp_home && echo "Removed [$gp_home]"
+        [ -d ${gp_home} ] && rm -rf $gp_home && echo "Removed [$gp_home]"
         [ -d ${master_data_folder} ] && rm -rf $master_data_folder && echo "Removed [$master_data_folder]"
         for server in `cat $SegmentList`
         do
