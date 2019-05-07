@@ -233,7 +233,7 @@ sub install_gpdb_binary
     ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
     
-    my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1'\n);
+    my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'\n);
     my $LINE_PGPORT = qq(export PGPORT=$gp_port\n);
     my $LINE_GPHOME = qq(export GPHOME=$gp_home\n);
 
@@ -399,7 +399,7 @@ sub set_env
 sub stop_gpdb
 {
     my $config=shift;
-        print Dumper $config;
+    # print Dumper $config;
     my $checking_result = &check_gpdb_isRunning($config);
 
     if ($checking_result->{'pid'} == 0)
