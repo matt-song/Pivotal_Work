@@ -187,7 +187,7 @@ sub install_gpdb_binary
         my $count = 4 - $length;
         foreach my $i (1..$count)
         {
-            $gp_port_cmd .= '0';
+            $gp_port .= '0';
         }
     }
     else
