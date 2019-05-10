@@ -16,13 +16,14 @@ alias ll='ls -lG'
 alias c='bash ~/scripts/run_c_program.sh'
 
 ### case management ###
-alias sf='perl ~/scripts/update_case.pl -t template'
-alias case_finder='perl ~/scripts/update_case.pl -t find -c'
-alias ir='perl /Users/xsong/scripts/update_case.pl -t ir -l'
-alias ircn='perl /Users/xsong/scripts/update_case.pl -t ir -l cn'
-alias eogs='perl /Users/xsong/scripts/update_case.pl -t eogs'
-alias logs='perl /Users/xsong/scripts/update_case.pl -t log -c'
+alias sf='perl ~/scripts/case_management.pl -t template'
+alias case_finder='perl ~/scripts/case_management.pl -t find -c'
+alias ir='perl /Users/xsong/scripts/case_management.pl -t ir -l'
+alias ircn='perl /Users/xsong/scripts/case_management.pl -t ir -l cn'
+alias eogs='perl /Users/xsong/scripts/case_management.pl -t eogs'
+alias logs='perl /Users/xsong/scripts/case_management.pl -t log -c'
 alias clipboard='killall pboard'
+alias report='perl /Users/xsong/scripts/case_management.pl -t case_report'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;

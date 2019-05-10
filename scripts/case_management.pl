@@ -37,6 +37,11 @@ elsif ($task =~ /log/i)
 {
     generate_ask_log_template($case_to_check);
 }
+elsif ($task =~ /report/i)
+{
+    my $input = &get_input();
+    generate_case_report($input);
+}
 else
 {
     &print_help;
@@ -66,6 +71,32 @@ sub print_help
     alias logs='perl $0 -t log -c'
 \n";
     exit 1;
+}
+
+sub generate_case_report
+{
+    my $input = shift;
+    my $total_line = scalar keys $input;
+    my $count = 0;
+    my ($case_no, $case_title, $customer);
+
+    system('clear');
+    my $report_file = "${work_folder}/case_report.txt";
+    open REPORT,'>',$report_file or die "Unable to open file [$report_file]";
+    while ($count < $total_line)
+    {
+        my $line = $input->{$count};
+        if ($line =~ /^\d+$/)
+        {
+            $case_no = $input->{$count};
+            $customer = $input->{$count+1};
+            $case_title = $input->{$count+2};
+            print REPORT "$case_no    $customer    $case_title\n\n\n";
+        }
+        $count++;
+    }
+    system("open $report_file");
+    return 0;
 }
 
 sub generate_ask_log_template
