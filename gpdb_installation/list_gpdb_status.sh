@@ -1,5 +1,6 @@
 #!/bin/bash
 # use this script to list existing GPDB status
+# I am too lazy to make code simple, no time for that, so will copy/paste duplicate code for 2 scenarios
 
 SegmentList="/home/gpadmin/all_segment_hosts.txt"
 GP_HOME="/opt"
@@ -39,6 +40,7 @@ print_help()
     scriptName=`basename $0`
     ECHO_WARN "Usage:\n 
     $scriptName         list all installed GPDB
+    $scriptName -f      list all installed GPDB along with space usage
     $scriptName -D      enable debug mode
     $scriptName -h      print this message"
     exit 1
@@ -47,33 +49,35 @@ print_help()
 ### Start the work ###
 
 ### get the parameters ###
-while getopts 'Dh' opt
+while getopts 'Dhf' opt
 do
     case $opt 
     in
         D) DEBUG=1              ;;
+        f) get_space_usage=1    ;;
         h) print_help           ;;
         *) echo "Wrong input, please check the usage with [$0 -h]" ;;
   esac
 done
 
-clear
-ECHO_SYSTEM "Generating the report of installed GPDB, this might take few minutes...\n"
+clear; ECHO_SYSTEM "Generating the report of installed GPDB, this might take few minutes...\n"
 
-for build in `ls $GP_HOME | grep "^greenplum_"`
-do
-    gp_ver=`echo $build |  sed 's/greenplum_//g'`
-    master_data="$GP_DATA_MASTER/master_${gp_ver}"
 
-    ### get the gphome and master data folder's usage ###
-    GPHOME_Usage=`du -s $GP_HOME/$build | awk '{print $1}'`
-    MASTER_Usage=`du -s $GP_DATA_MASTER/master_${gp_ver} | awk '{print $1}'`
-    total_usage=$(($GPHOME_Usage+$MASTER_Usage))
+### Scenario#1, list everything ###
+if [ "x$get_space_usage" == 'x1' ]
+then
+    for build in `ls $GP_HOME | grep "^greenplum_"`
+    do
+        gp_ver=`echo $build |  sed 's/greenplum_//g'`
+        master_data="$GP_DATA_MASTER/master_${gp_ver}"
 
-    ECHO_DEBUG "GP version: [$gp_ver], Master folder: [$master_data] and usage: [$MASTER_Usage]; GPHOME: [$GP_HOME/$build] and usage: [$GPHOME_Usage]"
+        ### get the gphome and master data folder's usage ###
+        GPHOME_Usage=`du -s $GP_HOME/$build | awk '{print $1}'`
+        MASTER_Usage=`du -s $GP_DATA_MASTER/master_${gp_ver} | awk '{print $1}'`
+        total_usage=$(($GPHOME_Usage+$MASTER_Usage))
 
-    if [ "x$hostname" == 'xsmdw' ]
-    then
+        ECHO_DEBUG "GP version: [$gp_ver], Master folder: [$master_data] and usage: [$MASTER_Usage]; GPHOME: [$GP_HOME/$build]"
+
         ### get the port and data folder name on segment ###
         port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `
         gp_port=`echo $port_md5_int % 9999 | bc`
@@ -105,16 +109,30 @@ do
             total_usage=$(($total_usage+$segment_total_usage));
         done
         total_usage_readable=`numfmt --from-unit=1024 --to=iec $total_usage`
+        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ] \t Total usage: [ ${yellow}$total_usage_readable${normal} ]" 
+    done
+    echo ""
 
-        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ] \t Total usage: [ ${yellow}$total_usage_readable${normal} ]"
-        
-    else  ### for all in one gpdb
-        gp_seg_data_folder='/data/segment/segment_${gp_ver}'
-        SegmentUsage=`du -sh $gp_seg_data_folder | awk '{print $1}'`
-        total_usage=$(($total_usage+$SegmentUsage))
-        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Total usage: [ $total_usage ]"
-    fi
-    
-done
-echo ""
+### Scenario#2, only list build/port/status ###
+else
+    for build in `ls $GP_HOME | grep "^greenplum_"`
+    do
+        gp_ver=`echo $build |  sed 's/greenplum_//g'`
+
+        ### get the port and data folder name on segment ###
+        port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `
+        gp_port=`echo $port_md5_int % 9999 | bc`
+
+        status="${green}Online${normal}"
+        isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
+        [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
+
+        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ]"
+    done
+    echo ""
+fi
+
+
+
+
 
