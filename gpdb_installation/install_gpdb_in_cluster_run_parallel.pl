@@ -6,6 +6,8 @@
 #                                                                                         #
 # Some notes here:                                                                        #
 #                                                                                         #
+# - The script will read the segment list from $segment_list_file                         #
+#                                                                                         #
 # - PGPORT generate basd on md5 of gp version, for example:                               #
 #   echo `echo "5.17.0" | md5sum | awk '{print $1}' | tr a-f A-F ` % 9999 | bc            #
 #                                                                                         #
@@ -38,15 +40,17 @@ my $gpdb_master_home = "/data/master";
 # $gpdb_segment_home = "/data1/segment";  ### the segmnet folder will be defined in install_gpdb_binary
 my $gpdb_segment_num = 2;                   
 my $master_hostname = 'smdw';                                                          ## master host
-my @segment_list = ('sdw1','sdw2','sdw3','sdw4','sdw5','sdw6');                 ## segment hosts list
 my $gp_user = 'gpadmin';
+my $segment_list_file = "/home/gpadmin/all_segment_hosts.txt";
 
 &print_help if $opts{'h'};
 
 ### start to work ###
 
-## Step#1 Create the working folder
+## Step#1 Create the working folder and get the segment list from $segment_list_file
+my @segment_list = get_segment_list($segment_list_file);
 working_folder("create");
+
 
 ## Step#2 get the binary file from package
 my $gpdb_binary = extract_binary("$gpdb_bin");
@@ -64,6 +68,24 @@ init_gpdb($gp_info);
 set_env($gp_info);
 
 working_folder("clear");
+
+sub get_segment_list
+{
+    my $segment_file = shift;
+    my @all_segment;
+    open FILE, $segment_file or do {ECHO_ERROR("Unable to read the segment file [$segment_file], exit "),1};
+    foreach my $host (<FILE>)
+    {
+        chomp($host);
+        next if ($host =~ /^#/);
+        ECHO_DEBUG("Adding host [$host] into the segment list...");
+        push @all_segment, $host;
+    }
+    close FILE;
+    # print Dumper @all_segment;
+    return @all_segment;
+}
+
 
 sub check_folder_existed_and_remove
 {

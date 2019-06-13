@@ -91,7 +91,7 @@ then
 
         declare -A SegmentUsage     ### hash for store space usage for all segment
 
-        for host in `cat $SegmentList`
+        for host in `cat $SegmentList | grep -v "^#"`
         do
             ### segment data folder usage ###
             usage_seg_data=`ssh $host "du -s $gp_seg_data_folder 2>/dev/null | awk '{print \\\$1}' "`
