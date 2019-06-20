@@ -225,11 +225,16 @@ sub generate_template
     while ($count < $total_line)
     {
         my $line = $input->{$count};
-        
-        $product = $input->{($count+1)} if ($line =~ /^Product$/);
-        $version = $input->{($count+1)} if ($line =~ /^Product Version$/);
-        $case_no = $input->{($count+1)} if ($line =~ /^Case Number$/);
-        $cur_sev = $input->{($count+1)} if ($line =~ /^Severity$/);
+
+        $product = $1 if ($line =~ /^Product(\w+\s+.*)$/);
+        $version = $1 if ($line =~ /^Product Version(.*)$/);
+        $case_no = $1 if ($line =~ /^Case Number(\d+)$/);
+        $cur_sev = $1 if ($line =~ /^Severity (\d+) Details$/); 
+
+#        $product = $input->{($count+1)} if ($line =~ /^Product$/);
+#        $version = $input->{($count+1)} if ($line =~ /^Product Version$/);
+#        $case_no = $input->{($count+1)} if ($line =~ /^Case Number$/);
+#        $cur_sev = $input->{($count+1)} if ($line =~ /^Severity$/);
 
         $count++;
     }
