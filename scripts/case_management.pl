@@ -229,7 +229,7 @@ sub generate_template
         $product = $1 if ($line =~ /^Product(\w+\s+.*)$/);
         $version = $1 if ($line =~ /^Product Version(.*)$/);
         $case_no = $1 if ($line =~ /^Case Number(\d+)$/);
-        $cur_sev = $1 if ($line =~ /^Severity (\d+) Details$/); 
+        $cur_sev = $1 if ($line =~ /^SeveritySeverity (\d+ - \w+)$/); 
 
 #        $product = $input->{($count+1)} if ($line =~ /^Product$/);
 #        $version = $input->{($count+1)} if ($line =~ /^Product Version$/);

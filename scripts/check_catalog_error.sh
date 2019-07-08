@@ -16,14 +16,14 @@ do
     echo -e "\nGenerating SQL for error in [$Item]...\n"
     header=`grep -A $(($count+1)) -E " $Item has [0-9]+ issue\(s\)$" $File | head -2  | grep "|" | awk '{print $1}'`
     
-    for i in `grep -A $(($count+1)) -E " $Item has [0-9]+ issue\(s\)$" $File | grep "|" | awk '{print $1}' | grep -v oid | sort -u`; 
+    for i in `grep -A $(($count+1)) -E " $Item has [0-9]+ issue\(s\)$" $File | grep "|" | awk '{print $1}' | grep -v $header | sort -u`; 
     do 
-        echo "SELECT oid,* from $Item where $header = $i;"; 
+        echo "SELECT * from $Item where $header = $i;"; 
     done
 
     echo ""
 
-    for i in `grep -A $(($count+1)) -E " $Item has [0-9]+ issue\(s\)$" $File | grep "|" | awk '{print $1}' | grep -v oid | sort -u`; 
+    for i in `grep -A $(($count+1)) -E " $Item has [0-9]+ issue\(s\)$" $File | grep "|" | awk '{print $1}' | grep -v $header | sort -u`; 
     do 
         echo "SELECT gp_segment_id,* from gp_dist_random('$Item') where $header = $i;"; 
     done
