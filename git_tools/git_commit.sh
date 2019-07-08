@@ -6,5 +6,5 @@ DATE_NOW=`date +%F`
 
 cd ~/Pivotal_Work
 git add *
-git commit -m "$msg Updated at $DATE_NOW"
+git commit -a -m "$msg Updated at $DATE_NOW"
 git push -u origin master
