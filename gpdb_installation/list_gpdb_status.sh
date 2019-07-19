@@ -45,6 +45,28 @@ print_help()
     $scriptName -h      print this message"
     exit 1
 }
+get_port()
+{
+    gp_ver=$1
+
+    ### get the port and data folder name on segment ###
+    port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `
+    gp_port=`echo $port_md5_int % 9999 | bc`
+
+    ### if port < 1000 then add 0 at the end ###
+    if [ $gp_port -lt 10 ] 
+    then
+        gp_port="${gp_port}000"
+    elif [ $gp_port -lt 100 ]
+    then
+        gp_port="${gp_port}00"
+    elif [ $gp_port -lt 1000 ]
+    then
+        gp_port="${gp_port}0"
+    fi
+
+    echo "$gp_port"
+}
 
 ### Start the work ###
 
@@ -78,9 +100,8 @@ then
 
         ECHO_DEBUG "GP version: [$gp_ver], Master folder: [$master_data] and usage: [$MASTER_Usage]; GPHOME: [$GP_HOME/$build]"
 
-        ### get the port and data folder name on segment ###
-        port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `
-        gp_port=`echo $port_md5_int % 9999 | bc`
+        gp_port=`get_port $gp_ver`
+
         gp_data_id=`echo $gp_port % 2 + 1 | bc`
         gp_seg_data_folder="/data${gp_data_id}/segment/segment_${gp_ver}"
 
@@ -118,10 +139,7 @@ else
     for build in `ls $GP_HOME | grep "^greenplum_"`
     do
         gp_ver=`echo $build |  sed 's/greenplum_//g'`
-
-        ### get the port and data folder name on segment ###
-        port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `
-        gp_port=`echo $port_md5_int % 9999 | bc`
+        gp_port=`get_port $gp_ver`
 
         status="${green}Online${normal}"
         isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
