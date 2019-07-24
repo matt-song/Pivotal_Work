@@ -186,7 +186,7 @@ sub install_gpdb_binary
     ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
     ECHO_INFO("updating [greenplum_path.sh] with MASTER_DATA_DIRECTORY");
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
-    my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
+    my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1');
     print GP_PATH "$line\n";
     close GP_PATH;
    
