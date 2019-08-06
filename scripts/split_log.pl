@@ -9,17 +9,30 @@ my $logFile = $opts{'f'};
 my $lineEachFile = $opts{'l'};
 
 ### start work ###
-## TBD, add help message 
+
+&print_usage if $opts{'h'};   
+
 my $allLines = get_total_lines_count($logFile);
 split_logs($logFile,$allLines);
 
 
 ### functions ###
 
+sub print_usage
+{
+    my $program = $0;
+    ECHO_SYSTEM("Usage: $0 -f [log File] -l [lines per file]");
+    exit 1;
+}
+
 sub get_total_lines_count
 {
     my $log = shift;
-    ECHO_ERROR("No such file [$log], exit!",1) if ( ! -f $log );
+    if ( ! -f $log )
+    {   
+        ECHO_ERROR("No such file [$log], exit!") ;
+        &print_usage;
+    }
     my $result = 0;
 
     ECHO_INFO("Calculating the count of lines in [$log]...");
@@ -60,8 +73,22 @@ sub split_logs
 
     ### clean all split file before we start ###
     ### TDB, add check and skip if no files ###
-    ECHO_INFO("Checking if any existing split file before we start...");
-    system(qq(rm -i ./*.split.*));
+    chomp(my $existing_split_file_count=`find ./ -name "${log}.split.*" | wc -l | sed 's/ //g'`);
+    #print "$split_file_count";
+    if ($existing_split_file_count > 0)
+    {
+        ECHO_INFO("Found [$existing_split_file_count] existing split files, remove it?");
+        chomp(my $confirm = <STDIN>);
+        if ($confirm =~ /y|yes/i )
+        {
+            ECHO_SYSTEM("Removing below files: ");
+            system(qq(rm -v ./${log}.split.*));
+        }
+        else
+        {
+            ECHO_ERROR("cancelled by user, will append to the existing files, this is NOT recommended")
+        }
+    }
 
     my $count=0; 
     my $file_id=0;
