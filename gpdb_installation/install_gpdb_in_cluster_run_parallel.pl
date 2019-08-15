@@ -31,13 +31,13 @@ use Getopt::Std;
 my %opts; getopts('hf:Dy', \%opts);
 
 my $DEBUG = $opts{'D'};   
-my $gpdb_bin = $opts{'f'};
+my $gpdb_package = $opts{'f'};
 my $ALL_YES = $opts{'y'};
 
 my $working_folder = "/tmp/.$$";
 my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
-# $gpdb_segment_home = "/data1/segment";  ### the segmnet folder will be defined in install_gpdb_binary
+# $gpdb_segment_home = "/data1/segment";  ### the segmnet folder will be defined in install_gpdb_package
 my $gpdb_segment_num = 2;                   
 my $master_hostname = 'smdw';                                                          ## master host
 my $gp_user = 'gpadmin';
@@ -53,13 +53,13 @@ working_folder("create");
 
 
 ## Step#2 get the binary file from package
-my $gpdb_binary = extract_binary("$gpdb_bin");
+my $gpdb_install_file = extract_binary("$gpdb_package");
 
 ## Steo#3 install the binary to $gpdp_home_folder
-my $gp_info = install_gpdb_binary("$gpdb_binary");
+my $gp_info = install_gpdb_package("$gpdb_install_file");
 
 ## steo#4 distribute the package, suppose the ssh key has been synced ##
-install_package_on_segment_server($gp_info);
+install_package_on_segment_server($gp_info,$gpdb_install_file);
 
 ## Step#5 initialize the GPDB
 init_gpdb($gp_info);
@@ -117,29 +117,59 @@ sub check_folder_existed_and_remove
 
 sub install_package_on_segment_server
 {
-    my $gp_info = shift;
+    my ($gp_info,$gpdb_install_file) = @_;
     my $gp_home = $gp_info->{'gp_home'};
+    my $gp_ver = $gp_info->{'ver'};
     my $host_file = "${gp_home}/all_hosts"; 
+    my $seg_hosts = "${gp_home}/seg_hosts";
 
     ECHO_INFO("Cleaning folder [$gp_home] on segment servers...");
 
     ### check if the segment server already have package installed ###
     check_folder_existed_and_remove($gp_home,1);
 
-    ECHO_INFO("Distributing package to all segment server...");
-    my $result = run_command(qq (
+    ### if install with RPM then we had to manually do install on all segment ###
+    if ($gpdb_install_file =~ /\.rpm$/) 
+    {
+        chomp(my $package_basename=`basename $gpdb_install_file`);
+        ECHO_DEBUG("Package basename is [$package_basename]");
+        open SEG_HOSTS,$seg_hosts or do { ECHO_ERROR("unable to read file [$host_file], exit!",1) };
+        foreach my $host (<SEG_HOSTS>)
+        {
+            chomp $host;
+            ECHO_INFO("Installing package on host: [$host]...");
+
+            ### Step#1: clean old package 
+            run_command(qq(sudo ssh $host " [ \\`rpm -qa | grep greenplum-db | grep ${gp_ver} | wc -l\\` -gt 0 ] && rpm -e \\`rpm -qa | grep greenplum-db | grep ${gp_ver}\\` || : "),1);
+            ### Step#2: scp the file to target server 
+            run_command(qq(scp $gpdb_install_file gpadmin\@${host}:/tmp/${package_basename}),1 );
+            ### Step#3: install the rpm ### 
+            run_command(qq(sudo ssh $host "yum -y install /tmp/${package_basename}"));
+            run_command(qq(sudo ssh $host "chown gpadmin:gpadmin -R \\`ls -d /usr/local/greenplum-*/ | grep $gp_ver | sed 's/\\/\$//g'\\`" ),1);
+            ### Step#4: Link the folder from /usr/local to $gpdp_home_folder
+            run_command(qq(ssh $host "ln -s \\`ls -d /usr/local/greenplum-*/ | grep $gp_ver | sed 's/\\/\$//g'\\` $gp_home" ),1);
+            ### Step#5: remove the package from /tmp 
+            run_command(qq(ssh $host "rm -f /tmp/${package_basename}"),1);
+            ### Step#6: copy the greenplum_path to target server 
+            run_command(qq(scp $gp_home/greenplum_path.sh gpadmin\@$host:$gp_home/greenplum_path.sh));
+            ECHO_INFO("Package installed on host [$host]");
+        }
+    }
+    ### if install with bin then just use gpseginstall ###
+    elsif ($gpdb_install_file =~ /\.bin$/)
+    {
+        ECHO_INFO("Distributing package to all segment server...");
+        my $result = run_command( qq(
         source ${gp_home}/greenplum_path.sh; 
         gpseginstall -f $host_file 2>&1 > /dev/null
-    ));
-
+        ));
+    }
     foreach my $server (@segment_list)
     {
         ECHO_INFO("Create the link greenplum-db in [$gp_home] on segment [$server]...");
         run_command(qq(ssh $server "[ -h $gpdp_home_folder/greenplum-db ] && rm -f $gpdp_home_folder/greenplum-db || exit 0" )) ;
         run_command(qq(ssh $server "ln -s $gp_home $gpdp_home_folder/greenplum-db"));
     }
-    #print "install_package_on_segment_server: result is [$result]"
-
 }
 
 sub print_help
@@ -170,28 +200,35 @@ sub working_folder
 sub extract_binary
 {
     my $package = shift;
-    
-    ECHO_ERROR("Unable to locate file [$package], run [# $0 -h] to check the usage of the script!",1) if ( ! -f $package); 
 
-    ECHO_INFO("Extracting GPDB package [$package] into [$working_folder]...");
-    run_command(qq(unzip -qo $package -d $working_folder),1);
-    
-    my $result = run_command(qq(ls $working_folder | grep "bin\$"),1);
-    my $binary = $result->{'output'};
-    ECHO_INFO("Successfully extracted binary [$binary]");    
+    ECHO_ERROR("Unable to locate file [$package], run [# $0 -h] to check the usage of the script!",1) if ( ! -f $package);
 
-    return $binary;
+    if ($package =~ /\.rpm/)  ### is xxx.rpm
+    {
+        return $package;
+    }
+    else ### is xxxx.zip
+    {
+        ECHO_INFO("Extracting GPDB package [$package] into [$working_folder]...");
+        run_command(qq(unzip -qo $package -d $working_folder),1);
+        
+        my $result = run_command(qq(ls $working_folder | grep "bin\$"),1);
+        my $binary = $result->{'output'};
+        ECHO_INFO("Successfully extracted binary [$binary]");    
+
+        return $binary;
+    }
 }
 
-sub install_gpdb_binary
+sub install_gpdb_package
 {
-    my $binary = shift;
+    my $package = shift;
     my $gp_info;
 
     ### print the settings and ask user to confirm ###
-    ECHO_INFO("Will start to install binary [$binary], please review below setting");
+    ECHO_INFO("Will start to install package [$package], please review below setting");
     
-    my $gp_ver = $1 if ($binary =~ /greenplum-db-([\d\.]+)-/);
+    my $gp_ver = $1 if ($package =~ /greenplum-db-([\d\.]+)-/);
     my $gp_home = "${gpdp_home_folder}/greenplum_${gp_ver}";
     my $master_folder = "$gpdb_master_home/master_${gp_ver}";
     my $segment_count = $gpdb_segment_num;
@@ -242,9 +279,40 @@ sub install_gpdb_binary
 
     check_folder_existed_and_remove($gp_home,0);
 
-    ECHO_INFO("Installing GPDB package to [$gp_home]...");
-    my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
-    ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
+    ### for RPM package, we need do the same on all hosts ###
+    if ($package =~ /\.rpm$/) 
+    {
+        ECHO_INFO("Check if there is any pre-installed package...");
+        my $check_RPM_isInstalled = run_command(qq(rpm -qa | grep greenplum-db | grep $gp_ver | wc -l ),1);
+
+        if ( $check_RPM_isInstalled->{'output'} > 0 )
+        {
+            ### check if rpm has already installed ###
+            &user_confirm("The package [$package] has already been installed, remove it?[y/n]");
+            run_command(qq(sudo rpm -e `rpm -qa | grep greenplum-db  | grep $gp_ver`), 1);
+            # run_command(qq([ -h $gp_home ] && rm -fv $gp_home || :),1 );
+            ECHO_INFO("Old package has been cleaned");
+        }
+        ### install the rpm ###
+        ECHO_INFO("Installing the rpm file now...");
+        run_command(qq(sudo yum -y install $package),1);
+        my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-* | grep $gp_ver));
+        my $default_folder = $find_default_folder->{'output'};
+        run_command(qq(sudo chown -R gpadmin:gpadmin $default_folder),1);
+        run_command(qq(sudo ln -s $default_folder $gp_home ));
+        ECHO_INFO("successfully installed [$package]!");
+    }
+    elsif ( $package =~ /\.bin$/)
+    {
+        my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${package} 1>/dev/null));
+        ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
+    }
+
+=old    
+            ECHO_INFO("Installing GPDB package to [$gp_home]...");
+            my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
+            ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
+=cut
 
     ### adding the host list into GPDB home folder ###
     ECHO_INFO("Adding host list into [${gp_home}]...");
@@ -290,7 +358,7 @@ export GPHOME=$gp_home
 );
     close GP_PATH;
    
-    ECHO_INFO("GPDB binary has been successfully installed to [$gp_home]");
+    ECHO_INFO("GPDB package has been successfully installed to [$gp_home]");
     # print Dumper $gp_info;
     return $gp_info;
 }
@@ -386,7 +454,7 @@ $conf_mirror);
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
     my $result = run_command(qq (
-        source ${gp_home}/greenplum_path.sh; 
+        unset LD_LIBRARY_PATH; source ${gp_home}/greenplum_path.sh; 
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     
@@ -489,7 +557,7 @@ sub stop_gpdb
 
             # sleep 3;
             my $result = &check_gpdb_isRunning($config);
-            ECHO_DEBUG("The result of check_gpdb_isRunning is [$result]...");
+            #ECHO_DEBUG("The result of check_gpdb_isRunning is [$result]...");
 
             if ($result->{'pid'} == 0) ## successfully shutdown
             {
@@ -552,7 +620,7 @@ sub check_gpdb_isRunning
     my $gphome = $config->{'gp_home'};
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $result = run_command(qq(ps -ef | grep silent | grep -v grep | grep $gphome | grep $port | awk '{print \$2","\$8}'));
+    my $result = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep master | grep $port | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
@@ -609,7 +677,7 @@ sub ECHO_SYSTEM
 sub ECHO_DEBUG
 {
     my ($message) = @_;
-    printColor('blue',"[DEBUG] $message"."\n") if $DEBUG;
+    printColor('cyan',"[DEBUG] $message"."\n") if $DEBUG;
 }
 sub ECHO_INFO
 {

@@ -47,11 +47,11 @@ declare -A GPDB_BUILD
 check_gpdb_running()
 {
     build=$1
-    #gp_ver=`echo $build | sed 's/greenplum_//g'`
-    isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
+    gp_ver=`echo $build | sed 's/greenplum_//g'`
+    isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
     if [ "x$isRunning" != 'x0' ]
     then
-        ECHO_WARN "GPDB installed in [/opt/$build] is running! Pleaes stop the DB first, exit!"
+        ECHO_WARN "GPDB installed in [/opt/$build] is running! Please stop the DB first, exit!"
         ECHO_WARN "Command: # source /opt/$build/greenplum_path.sh; gpstop -a -M fast"
         exit
     else
@@ -70,7 +70,7 @@ uninstallGPDB()
 
     ### special design for smdw ###
     hostname=`uname -n`
-    if [ "x$hostname" = 'xsmdw' ] 
+    if [ "x$hostname" == 'xsmdw' ] 
     then 
         port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `; port=`echo $port_md5_int % 9999 | bc`
         data_id=`echo $port % 2 + 1 | bc`
@@ -96,8 +96,13 @@ Please confirm if you would like to continue: [y/n]"
         [ -d ${master_data_folder} ] && rm -rf $master_data_folder && echo "Removed [$master_data_folder]"
         for server in `cat $SegmentList | grep -v "^#"`
         do
-            
-            ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed [$segment_data_folder] on segment host [$server]\""
+            if [ "x`echo $gp_ver | sed 's/\..*//g'`" == 'x6' ]
+            then
+                sudo ssh $server "[ `rpm -qa | grep greenplum-db | grep ${gp_ver} | wc -l` -gt 0 ] && rpm -e `rpm -qa | grep greenplum-db | grep ${gp_ver}` || : "
+                ssh $server "[ -h ${gp_home} ] && rm -f $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
+            else
+                ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed [$segment_data_folder] on segment host [$server]\""
+            fi            
             ssh $server "[ -d ${gp_home} ] && rm -rf $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
             #echo "Removed $segment_data_folder on segment host [$server]"
         done

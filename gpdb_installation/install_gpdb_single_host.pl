@@ -149,7 +149,7 @@ sub install_gpdb_package
         ### install the rpm ###
         ECHO_INFO("Installing the rpm file now...");
         run_command(qq(sudo yum -y install $package),1);
-        my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-* | grep $gp_ver));
+        my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-*/ | grep $gp_ver));
         my $default_folder = $find_default_folder->{'output'};
         run_command(qq(sudo chown -R gpadmin:gpadmin $default_folder),1);
         run_command(qq(sudo ln -s $default_folder $gp_home ));

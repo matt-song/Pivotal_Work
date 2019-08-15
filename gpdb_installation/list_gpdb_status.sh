@@ -107,7 +107,7 @@ then
 
         ### Check if GPDB is running ###
         status="${green}Online${normal}"
-        isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
+        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
         declare -A SegmentUsage     ### hash for store space usage for all segment
@@ -142,7 +142,7 @@ else
         gp_port=`get_port $gp_ver`
 
         status="${green}Online${normal}"
-        isRunning=`ps -ef | grep -w $build | grep -v grep | grep silent | wc -l `
+        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
         echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ]"
