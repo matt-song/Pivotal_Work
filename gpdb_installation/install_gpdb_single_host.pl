@@ -173,7 +173,7 @@ sub install_gpdb_package
 
     ### adding $MASTER_DATA_DIRECTORY to greenplum_path.sh
     ECHO_INFO("Updating greenplum_path.sh..");
-    run_command(qq( sed -i 's~GPHOME=/usr/local/greenplum-db-.*~GPHOME=${gp_home}~g' $gp_home/greenplum_path.sh));
+    run_command(qq( sed -i 's~GPHOME=/usr/local/greenplum-db-.*~GPHOME=${gp_home}~g' $gp_home/greenplum_path.sh),1);
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
     my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
     print GP_PATH "$line\n";
