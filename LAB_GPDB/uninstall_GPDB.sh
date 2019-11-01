@@ -94,6 +94,11 @@ Please confirm if you would like to continue: [y/n]"
 
         [ -d ${gp_home} ] && rm -rf $gp_home && echo "Removed [$gp_home]"
         [ -d ${master_data_folder} ] && rm -rf $master_data_folder && echo "Removed [$master_data_folder]"
+        
+        ECHO_WARN "Check if there is any rpm package for [$gp_ver], might need root privilege (sudo) to remove the rpm..."
+        ## no need to check version since it will skip if did no find rpm package
+        [ `rpm -qa | grep greenplum-db | grep ${gp_ver} | wc -l` -gt 0 ] && sudo rpm -e `rpm -qa | grep greenplum-db | grep ${gp_ver}` || :
+
         for server in `cat $SegmentList | grep -v "^#"`
         do
             if [ "x`echo $gp_ver | sed 's/\..*//g'`" == 'x6' ]

@@ -231,10 +231,11 @@ sub generate_template
         $case_no = $1 if ($line =~ /^Case Number(\d+)$/);
         $cur_sev = $1 if ($line =~ /^SeveritySeverity (\d+ - \w+)$/); 
 
-#        $product = $input->{($count+1)} if ($line =~ /^Product$/);
-#        $version = $input->{($count+1)} if ($line =~ /^Product Version$/);
-#        $case_no = $input->{($count+1)} if ($line =~ /^Case Number$/);
-#        $cur_sev = $input->{($count+1)} if ($line =~ /^Severity$/);
+        ### capture again since Saleforce changes a lot ... shit ###
+        $product = $input->{($count+1)} if ($line =~ /^Product$/);
+        $version = $input->{($count+1)} if ($line =~ /^Product Version$/);
+        $case_no = $input->{($count+1)} if ($line =~ /^Case Number$/);
+        $cur_sev = $input->{($count+1)} if ($line =~ /^Severity$/);
 
         $count++;
     }
