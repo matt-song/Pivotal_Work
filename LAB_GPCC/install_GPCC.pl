@@ -2,7 +2,7 @@
 ###########################################################################################
 # Author:      Matt Song                                                                  #
 # Create Date: 2019.10.30                                                                 #
-# Description: Install GPCC                                                               #
+# Description: Install GPCC, supported version: 4x                                        #
 #                                                                                         #
 # // Some notes here: //                                                                  #
 #                                                                                         #
@@ -52,7 +52,6 @@ my $DB_INFO=findAvailableGPDB($gpcc_ver);
 ### Install the binary ###
 installBinary($gpcc_binary,$gpcc_ver,$DB_INFO);
 
-
 ### clean the work folder ###
 workingFolderManager("clear");
 
@@ -65,7 +64,6 @@ sub findAvailableGPDB
     # get the family of the gpcc 
     my $gpcc_family = (split(/\./, $gpcc_ver))[0];
 
-    ### in future gpcc 4.x could no longer support GPv5 so we will change below hash.
     my $version_map = {
         '6'=>'greenplum_6',
         '4'=>'greenplum_5',
@@ -154,7 +152,7 @@ language = 1
     }
     else
     {
-        ECHO_ERROR("Failed to installed the GPCC, please check and try again, exit now.",1);
+        ECHO_ERROR("Failed to install the GPCC, please check and try again, exit now.",1);
     }
 }
 
