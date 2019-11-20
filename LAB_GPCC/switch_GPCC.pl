@@ -73,9 +73,17 @@ sub getAvailableGPDB
         my $gpdb_version = $1 if ($build =~ /greenplum_([\w\.]+)/);
         ECHO_DEBUG("Found the version of GPDB [$gpdb_version]");
 
+        ### check if GPDB is functional ###
         my $checkRunning = runCommand(qq(ps -ef | grep $gpdb_home_folder | grep postgres | grep master | grep "\\\-D" | grep "$gpdb_version" | grep -v "sh \\\-c ps \\\-ef" | wc -l));
         my $status = $checkRunning->{'output'} > 0 ? 'online':'offline';
 
+        if ($status eq 'online') 
+        {
+            my $testDB = runCommand(qq(source ${gpdb_home_folder}/${build}/greenplum_path.sh; timeout 10 psql postgres -Atc "select 99;" | grep -w 99));
+            $status = 'unavailable' if ($testDB->{'output'} == 99);
+        }
+
+        ### get the port of GPDB ###
         my $checkPort = runCommand(qq(echo `echo "$gpdb_version" | md5sum | awk '{print \$1}' | tr a-f A-F` % 9999 | bc),1);
         my $port = $checkPort->{'output'};
         if (length($port) < 4)

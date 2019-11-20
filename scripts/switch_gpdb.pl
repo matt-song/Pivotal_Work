@@ -1,1 +1,0 @@
-../gpdb_installation/switch_gpdb.pl

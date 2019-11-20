@@ -144,7 +144,24 @@ sub install_package_on_segment_server
             ### Step#2: scp the file to target server 
             run_command(qq(scp $gpdb_install_file gpadmin\@${host}:/tmp/${package_basename}),1 );
             ### Step#3: install the rpm ### 
-            run_command(qq(sudo ssh $host "yum -y install /tmp/${package_basename}"));
+            
+            my $checkAlreadyInstalled=run_command(qq(ssh $host "rpm -qa | grep greenplum | wc -l"),1);
+            #run_command(qq(ssh $host "rpm -qa | grep greenplum"));
+            if ($checkAlreadyInstalled->{'output'} > 0 )
+            {
+                ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
+                run_command(qq(sudo ssh $host "rpm -ivh /tmp/${package_basename} --force"),1);
+            }
+            else
+            {
+                run_command(qq(sudo ssh $host "yum -y install /tmp/${package_basename}"),1);
+            }
+            #my $installDB=run_command(qq(sudo ssh $host "yum -y install /tmp/${package_basename}"));
+            #if ($installDB->{'code'} ne 0)
+            #{
+            #    ECHO_SYSTEM("[WARN] YUM installation failed, could because some higher version of GP6 has been installed, try to install with rpm command");
+            #    run_command(qq(sudo ssh $host "rpm -ivh /tmp/${package_basename} --force"),1);
+            #}
             run_command(qq(sudo ssh $host "chown gpadmin:gpadmin -R \\`ls -d /usr/local/greenplum-*/ | grep $gp_ver | sed 's/\\/\$//g'\\`" ),1);
             ### Step#4: Link the folder from /usr/local to $gpdp_home_folder
             run_command(qq(ssh $host "ln -s \\`ls -d /usr/local/greenplum-*/ | grep $gp_ver | sed 's/\\/\$//g'\\` $gp_home" ),1);
@@ -295,7 +312,24 @@ sub install_gpdb_package
         }
         ### install the rpm ###
         ECHO_INFO("Installing the rpm file now...");
-        run_command(qq(sudo yum -y install $package),1);
+        
+        my $checkMasterInstalled=run_command(qq(rpm -qa | grep greenplum | wc -l),1);
+        if ($checkMasterInstalled->{'output'} > 0 )
+        {
+            ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
+            run_command(qq(sudo rpm -ivh ${package} --force),1);
+        }
+        else
+        {
+            run_command(qq(sudo yum -y install ${package}),1);
+        }
+        # my $installDBMaster=run_command(qq(sudo yum -y install $package));
+        #if ($installDBMaster ne 0 )
+        #{
+        #    ECHO_SYSTEM("[WARN] YUM installation failed, could because some higher version of GP6 has been installed, try to install with rpm command");
+        #    run_command(qq(sudo rpm -ivh $package --force),1);
+        #}
+
         my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-* | grep $gp_ver));
         my $default_folder = $find_default_folder->{'output'};
         run_command(qq(sudo chown -R gpadmin:gpadmin $default_folder),1);

@@ -4,6 +4,7 @@
 #source_dir='/Users/xsong/Pivotal_Work/'
 conf='
 aio2|/Users/xsong/Pivotal_Work/|~/git_repository/|gpadmin
+aio1|/Users/xsong/Pivotal_Work/|~/git_repository/|gpadmin
 mdw|/Users/xsong/Pivotal_Work/|~/git_repository/|gpadmin
 smdw|/Users/xsong/Pivotal_Work/|/data/matt/Pivotal_Work/|gpadmin
 gfw|/Users/xsong/MiRoute_RemoteDownload/server/|/opt/web/remoteDownload/|root
