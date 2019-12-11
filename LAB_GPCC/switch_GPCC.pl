@@ -35,10 +35,25 @@ my $GPCC_LIST = getAviliableGPCC();
 my $GPDB_LIST = getAvailableGPDB();
 
 
+=workfolow:
+
+1. get aviliable gpcc/gpdb
+2. on gpdb, install gpperfmon (need remove the before install it) https://gpcc.docs.pivotal.io/440/topics/setup-collection-agents.html
+3. start gpcc
+
+=cut
+
 
 # runCommand(qq(ps -ef | grep $gpdb_home_folder | grep postgres | grep master | grep "\\\-D" | grep "5.17" | grep -v "sh \\\-c ps \\\-ef"));
 
-
+sub chooseTargetBuild
+{
+    my ($GPCC_LIST, $GPDB_LIST) = @_;
+    foreach my $id (sort keys $GPCC_LIST)
+    {
+        ## to be done 
+    }
+}
 
 sub getAviliableGPCC
 {
@@ -80,7 +95,7 @@ sub getAvailableGPDB
         if ($status eq 'online') 
         {
             my $testDB = runCommand(qq(source ${gpdb_home_folder}/${build}/greenplum_path.sh; timeout 10 psql postgres -Atc "select 99;" | grep -w 99));
-            $status = 'unavailable' if ($testDB->{'output'} == 99);
+            $status = 'unavailable' if ($testDB->{'output'} != 99);
         }
 
         ### get the port of GPDB ###
