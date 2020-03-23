@@ -29,12 +29,6 @@ my $gpcc_home_folder = "/opt";
 #my $segment_list_file = "/home/gpadmin/all_segment_hosts.txt";
 #my $list_gpdb_script = "/home/gpadmin/scripts/list_gpdb_status.sh";
 
-######### Start work from here #########
-
-my $GPCC_LIST = getAviliableGPCC();
-my $GPDB_LIST = getAvailableGPDB();
-
-
 =workfolow:
 
 1. get aviliable gpcc/gpdb
@@ -44,16 +38,48 @@ my $GPDB_LIST = getAvailableGPDB();
 =cut
 
 
-# runCommand(qq(ps -ef | grep $gpdb_home_folder | grep postgres | grep master | grep "\\\-D" | grep "5.17" | grep -v "sh \\\-c ps \\\-ef"));
+######### Start work from here #########
+
+### Step#1 Get aviliable GPCC/GPDB build
+my $GPCC_LIST = getAviliableGPCC();
+my $GPDB_LIST = getAvailableGPDB();
+
+### Step#2 Let user choose which the combination of GPDB and  GPCC 
+my $user_choice = chooseTargetBuild($GPCC_LIST,$GPDB_LIST);
+
+
+
+
 
 sub chooseTargetBuild
 {
-    my ($GPCC_LIST, $GPDB_LIST) = @_;
-    foreach my $id (sort keys $GPCC_LIST)
+    my ($GPDB,$GPCC) = @_;
+    my $result;
+    
+    system("clear");
+    ### choose the GPDB ###
+    ECHO_INFO("All aviliable GPDB build as below:\n");
+    for my $gpdb_id (sort { $a <=> $b } keys %$GPDB)
     {
-        ## to be done 
+        printColor('yellow',"    [$gpdb_id]:     $GPDB->{$gpdb_id}->{'version'}\n");
+    }
+    ECHO_INFO("Please choose the GPDB version for GPCC");
+    my $selectedGPDB = (<STDIN>);
+
+
+    ECHO_INFO("All aviliable GPCC build as below:\n");
+    for my $gpcc_id (sort { $a <=> $b } keys %$GPCC)
+    {
+        printColor('yellow',"    [$gpcc_id]:     $GPCC->{$gpcc_id}->{'version'}\n");
     }
 }
+
+sub getUserInput
+{
+    
+}
+
+
 
 sub getAviliableGPCC
 {
@@ -147,6 +173,37 @@ sub runCommand
     }
     return $run_info;
 }
+
+sub user_confirm
+{
+    my $msg = shift;
+
+    my $input;
+    if ($ALL_YES)
+    {
+        $input = 'yes';
+    }
+    else
+    {
+        ECHO_SYSTEM("\n$msg");
+        $input = (<STDIN>);
+    }
+
+    if ($input =~ /no|n/i)
+    {
+        ECHO_ERROR("Cancelled by user, exit!", 1);
+    }
+    elsif ($input =~ /yes|y/i) 
+    {
+        return 0;
+    }
+    else
+    {
+        ECHO_ERROR("Please input 'yes' or 'no'!");
+        &user_confirm($msg);
+    }
+}
+
 sub ECHO_WARN
 {
     my ($message) = @_;

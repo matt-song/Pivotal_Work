@@ -191,7 +191,7 @@ sub check_gpdb_isRunning
     my $result;
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $gpdb_proc = run_command(qq(ps -ef | grep silent | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    my $gpdb_proc = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$gpdb_proc);
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 

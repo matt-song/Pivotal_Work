@@ -148,7 +148,17 @@ sub install_gpdb_package
         }
         ### install the rpm ###
         ECHO_INFO("Installing the rpm file now...");
-        run_command(qq(sudo yum -y install $package),1);
+        my $checkMasterInstalled=run_command(qq(rpm -qa | grep greenplum | wc -l),1);
+        if ($checkMasterInstalled->{'output'} > 0 )
+        {
+            ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
+            run_command(qq(sudo rpm -ivh ${package} --force),1);
+        }
+        else
+        {
+            run_command(qq(sudo yum -y install ${package}),1);
+        }
+        #run_command(qq(sudo yum -y install $package),1);
         my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-*/ | grep $gp_ver));
         my $default_folder = $find_default_folder->{'output'};
         run_command(qq(sudo chown -R gpadmin:gpadmin $default_folder),1);
