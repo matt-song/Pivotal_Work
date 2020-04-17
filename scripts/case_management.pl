@@ -245,36 +245,55 @@ sub generate_template
     #### case update ####
     
     system('clear');
-    my $case_update = "
-================ GENERAL INFO ================
+    my $case_update = qq(
+### GENERAL INFO
 
 Case#:          $case_no
 Product:        $product
 Version:        $version
 Severity:       $cur_sev
 
-============= PROBLEM DESCRIPTION ============
+ 
 
+### PROBLEM DESCRIPTION 
 
-=========== CONCLUSION / ROOT CAUSE ==========
+- the issue is xxxx
 
+ 
 
-============ TROUBLESHOOTING DONE ============
+### CONCLUSION / ROOT CAUSE 
 
+- root cause...
 
-============== NEXT ACTION PLAN ==============
+ 
 
+### TROUBLESHOOTING DONE 
 
-================ RELATED LOGS ================
+- did xxx
+- done xxx
+- tried aaa
 
-";
+ 
+
+### NEXT ACTION PLAN 
+
+- next action is....
+
+ 
+
+### RELATED LOGS 
+
+```
+llogs
+```
+);
     ### open the file after created template ###
     if ($case_no)
     {
         my $folder = "${work_folder}/${case_no}";
         system(qq(mkdir -p $folder));
         
-        my $file = "${folder}/case_update_${case_no}.txt";
+        my $file = "${folder}/case_update_${case_no}.md";
         
         ### asking user if he would like to overide the existing file ###
         if ( -f $file)
