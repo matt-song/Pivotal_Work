@@ -60,7 +60,8 @@ switch_gpdb()
 count=0
 unset GPDB_BUILD; declare -A GPDB_BUILD
 
-for build in `ls $GP_HOME | grep greenplum_`
+#for build in `ls $GP_HOME | grep greenplum_`
+for build in `ls -d $GP_HOME/greenplum_*/ | awk -F'/' '{print $3}'`
 do
     count=$(($count+1))
     echo -e "    [$count]:  $build"
