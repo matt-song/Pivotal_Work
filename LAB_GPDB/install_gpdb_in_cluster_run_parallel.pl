@@ -150,7 +150,7 @@ sub install_package_on_segment_server
             if ($checkAlreadyInstalled->{'output'} > 0 )
             {
                 ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
-                run_command(qq(sudo ssh $host "rpm -ivh /tmp/${package_basename} --force"),1);
+                run_command(qq(sudo ssh $host "rpm -ivh /tmp/${package_basename} --force --nodeps"),1);
             }
             else
             {
@@ -317,7 +317,7 @@ sub install_gpdb_package
         if ($checkMasterInstalled->{'output'} > 0 )
         {
             ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
-            run_command(qq(sudo rpm -ivh ${package} --force),1);
+            run_command(qq(sudo rpm -ivh ${package} --force --nodeps),1);
         }
         else
         {

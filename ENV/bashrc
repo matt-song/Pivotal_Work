@@ -14,6 +14,7 @@ alias root='bash ~/scripts/connect_server.sh root'
 alias list='~/scripts/get_host_list.sh'
 alias ll='ls -lG'
 alias c='bash ~/scripts/run_c_program.sh'
+alias km='ssh root@km'
 
 ### case management ###
 alias sf='perl ~/scripts/case_management.pl -t template'
