@@ -1,5 +1,10 @@
 #!/bin/bash
 
+echo "
+------------------------------------------
+Checking the process list of install apps:
+------------------------------------------
+"
 ### Checking kafaka processes ###
 export PATH=$PATH:~/scripts:/opt/kafka_2.12-2.5.0/bin;
 ZK_PID=`ps -ef | grep kafka | grep /opt/kafka_2.12-2.5.0/config/zookeeper.properties | grep -v grep | awk '{print $2}'`
@@ -16,4 +21,13 @@ for proc in NameNode DataNode SecondaryNameNode
 do
     targetPid=`ps -ef | grep java | grep -w ${proc} |  awk '{print $2}'`
     [ "x$targetPid" == 'x' ] && echo "$proc is not running" || echo "$proc is running, pid: [$targetPid]"
+done
+echo ""
+
+### checking kerberos processes ###
+echo "=== Kerberos process list: ==="
+for proc in kdc kadmind
+do
+    targetKrbPid=`ps -ef | grep $proc | grep -v grep | awk '{print $2}'`
+    [ "x$targetKrbPid" == 'x' ] && echo "$proc is not running" || echo "$proc is running, pid: [$targetKrbPid]"
 done
