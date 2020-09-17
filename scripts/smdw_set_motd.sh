@@ -53,4 +53,16 @@ ECHO_Cyan "  # bash ~/scripts/uninstall_GPDB.sh\n"
 ECHO_LightCyan "- To check the space usage for each cluster"
 ECHO_Cyan "  # bash ~/scripts/list_gpdb_status.sh -f\n"
 
+ECHO_LightCyan "- HDFS INFO: "
+ECHO_Cyan "  host: sdw7 (172.28.8.7)\n  port: 9000\n  example: /opt/hadoop-3.3.0/bin/hdfs dfs -ls hdfs://sdw7:9000/\n"
+
+ECHO_LightCyan "- Kerberos INFO: "
+ECHO_Cyan "  host: sdw7 (172.28.8.7)\n  config file: /etc/krb5.conf\n  keytab: /opt/pxf-5.14.0/greenplum-pxf/keytabs/nn.service.keytab\n  principal for hdfs: nn/hdfs@lab.vmware.com\n  to test: # kinit -kt /etc/security/keytab/nn.service.keytab nn/hdfs\n"
+
+ECHO_LightCyan "- PXF INFO: "
+ECHO_Cyan "  1. run [# gpdb], then select 6.10\n  2. check if pxf is started [# pxf cluster status], if not, start it via [# pxf cluster start]\n"
+
+ECHO_LightCyan "- PATRONI INFO: "	##Added by Jimmy 20200830
+ECHO_Cyan "  1. switch to user postgres [# sudo su - postgres]\n  2. check cluster status [# patronictl -c /var/lib/pgsql/patroni_etcd_conf.d/postgres_member1.yaml list]\n  3. configuration files are located in /var/lib/pgsql/patroni_etcd_conf.d\n  4. patroni doc: https://patroni.readthedocs.io/en/latest/SETTINGS.html\n"
+
 ECHO_Yellow "Important: Please do not remove the file [all_segment_hosts.txt] and [all_hosts.txt] under gpadmin's home folder, it was required by above scripts\n"
