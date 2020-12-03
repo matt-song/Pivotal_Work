@@ -4,7 +4,10 @@
 # before running it on production or important clusters/database, 
 # as those scripts are for education purpose only and no offical support is provided for any bug.
 #
-#
+# Updated at 2020-12-03: 
+# The script was created by Faisal Ali @faisaltheparttimecoder years ago, 
+# since GPDB's official product name has changed recently, so we added some extra code to handle the new name.  
+# Thanks Faisal for creating such an amazing tool :)
 
 # Starting the program.
 
