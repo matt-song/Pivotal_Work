@@ -28,7 +28,7 @@ export script_dir=`pwd`
 export install_dir=`dirname $script_dir`
 export tmpdir=$script_dir/tmp
 export wrkdir=/tmp/wrkdir.$$
-export prod_name="Pivotal Greenplum"
+export prod_name='VMware Tanzu\u2122 Greenplum\u00ae'
 export dldir="/data/package"
 export api_token="2cq1tJV-ssR6H_tyvbTr"
 
@@ -127,6 +127,12 @@ grep '"name":' ${wrkdir}/prod_list | egrep -vi 'suite|foundry|buildpacks' | cut 
 # done
 
 # echo "INFO - Setting the product list to: " $prod_name
+
+### transfer / to ///
+# echo "[DEBUG] prod_name before: $prod_name"
+prod_name=$(echo $prod_name | sed 's/\\/\\\\\\/g')
+# echo "[DEBUG] prod_name after: $prod_name"
+### end
 
 echo "INFO - Setting the product list to: " $prod_name  
 
