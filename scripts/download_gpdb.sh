@@ -32,8 +32,8 @@ export install_dir=`dirname $script_dir`
 export tmpdir=$script_dir/tmp
 export wrkdir=/tmp/wrkdir.$$
 export prod_name='VMware Tanzu\u2122 Greenplum\u00ae'
-export dldir="/data/package"
-export api_token="2cq1tJV-ssR6H_tyvbTr"
+export dldir="/data/packages"
+export api_token="xxxxxxxxxxx"
 
 # Make working directory that will be used to store temporary files and 
 # this will be removed when the script ends.
