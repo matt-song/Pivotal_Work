@@ -1,0 +1,11 @@
+declare -a GPTEXT_HOSTS=ALLSEGHOSTS
+declare -a DATA_DIRECTORY=(/data/gptext/primary1 /data/gptext/primary2)
+JAVA_OPTS="-Xms512M -Xmx1024M"
+GPTEXT_PORT_BASE=18983
+GP_MAX_PORT_LIMIT=28983
+ZOO_CLUSTER="BINDING"
+declare -a ZOO_HOSTS=(mdw sdw1 sdw2)
+ZOO_DATA_DIR="/data/gptext/zoo-master/"
+ZOO_GPTXTNODE="gptext"
+ZOO_PORT_BASE=2188
+ZOO_MAX_PORT_LIMIT=12188
