@@ -76,7 +76,7 @@ sub print_help
 sub generate_case_report
 {
     my $input = shift;
-    my $total_line = scalar keys $input;
+    my $total_line = scalar keys %$input;
     my $count = 0;
     my ($case_no, $case_title, $customer);
 
@@ -218,7 +218,7 @@ sub get_input
 sub generate_template
 {
     my $input = shift;
-    my $total_line = scalar keys $input;
+    my $total_line = scalar keys %$input;
     my $count = 0;
     my ($product, $version, $case_no, $cur_sev);
 

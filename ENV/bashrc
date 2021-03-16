@@ -25,6 +25,7 @@ alias eogs='perl /Users/xsong/scripts/case_management.pl -t eogs'
 alias logs='perl /Users/xsong/scripts/case_management.pl -t log -c'
 alias clipboard='killall pboard'
 alias report='perl /Users/xsong/scripts/case_management.pl -t case_report'
+alias pivnet='export http_proxy="socks5://localhost:1086"; export https_proxy="socks5://localhost:1086"; pivnet'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;

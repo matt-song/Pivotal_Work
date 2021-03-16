@@ -1,11 +1,5 @@
 #!/bin/bash
 
-### ss settings ###
-hostIP='ipOfSShost'         ## the IP of host
-basePort=80                 ## the port with v2ray-plugin
-otherPort1=8001             ## the port without plugin
-ssKey='thePassWordOfSS'     ## ss key
-
 logs()
 {
     message=$1
@@ -16,12 +10,23 @@ logs()
 
 ### start work ###
 
-# Check if the script has already started
+# SS server INFO
+ss_password='xxxxxxxxxx'
+ss_bin='/opt/shadowsocks-libev/bin/ss-server'
+ss_port_v2ray='80'
+ss_port_normal='8001'
+ss_encryption='aes-128-gcm'
+ss_plugin='/opt/v2ray-plugin/v2ray-plugin'
+ss_pluginOpt='server'
+ss_listenAddr=`ip a | grep eth0 | grep inet | awk '{print $2}' | sed 's/\/.*//g'`
+ss_pidFile_v2ray="shadowsocks_${ss_port_v2ray}.pid"
+ss_pidFile_normal="shadowsocks_${ss_port_normal}.pid"
 
+# Check if the script has already started
 script_name=`basename $0`
 cur_pid=$$
 isRunning=`ps -ef | grep "bash $script_name" | grep -v grep | awk "{if(\\\$2==$cur_pid) {print}}" | wc -l`
-logs "Found [$isRunning] process of $script_name" 
+logs "Found [$isRunning] process of $script_name"
 
 if [ $isRunning -gt 1 ]
 then
@@ -30,45 +35,47 @@ then
 fi
 
 ### define the list to check ###
-SS_basePort_count=`ps -ef | grep ss-server | grep shadowsocksi_${basePort}.pid | wc -l`
-SS_otherPort1_count=`ps -ef | grep ss-server | grep shadowsocks_${otherPort1}.pid | wc -l`
+SS_v2ray_count=`ps -ef | grep ss-server | grep $ss_pidFile_v2ray | wc -l`
+SS_normal_count=`ps -ef | grep ss-server | grep $ss_pidFile_normal | wc -l`
 
-### check port 80 ###
-logs "Checking port $basePort SS status.."
-logs "The process count for port $basePort is [ $SS_basePort_count ]"
+### check port of v2ray ###
+logs "Checking port $ss_port_v2ray SS status.."
+logs "The process count for port $ss_port_v2ray is [ $SS_v2ray_count ]"
 
-if [ "x$SS_basePort_count" != 'x1' ]
+if [ "x$SS_v2ray_count" != 'x1' ]
 then
-    logs "SS on port $basePort has down, restart it!"
-    /opt/shadowsocks-libev/bin/ss-server -s $hostIP -p $basePort -k $ssKey -m aes-128-cfb --plugin /opt/v2ray-plugin/v2ray-plugin --plugin-opts server -f /tmp/.shadowsocksi_${basePort}.pid
-    
-    SS_basePort_count_new=`ps -ef | grep ss-server | grep shadowsocksi_${basePort}.pid | wc -l`
-    if [ "x$SS_basePort_count_new" != 'x1' ]
+    logs "SS on port $ss_port_v2ray has down, restart it!"
+    # /opt/shadowsocks-libev/bin/ss-server -s 66.42.73.37 -p 80 -k xyjrgss15jqd4f -m aes-128-cfb --plugin /opt/v2ray-plugin/v2ray-plugin --plugin-opts server -f /tmp/.shadowsocks_80.pid
+    $ss_bin -s $ss_listenAddr -p $ss_port_v2ray -k $ss_password -m $ss_encryption --plugin $ss_plugin --plugin-opts $ss_pluginOpt -f /tmp/.${ss_pidFile_v2ray}
+
+    SS_v2ray_count_new=`ps -ef | grep ss-server | grep $ss_pidFile_v2ray | wc -l`
+    if [ "x$SS_v2ray_count_new" != 'x1' ]
     then
-        logs "Failed to start the SS on prot $basePort, please check"
+        logs "Failed to start the SS on prot $ss_port_v2ray, please check"
     else
-        logs "SS on port $basePort has started successfully"
+        logs "SS on port $ss_port_v2ray has started successfully"
     fi
 else
-    logs "SS on port $basePort is running fine"
+    logs "SS on port $ss_port_v2ray is running fine"
 fi
 
-### check port without plugin ###
-logs "Checking port $otherPort1 SS status.."
-logs "The process count for port $otherPort1 is [ $SS_otherPort1_count ]"
+### check port of no-plugin ###
+logs "Checking port $ss_port_normal SS status.."
+logs "The process count for port $ss_port_normal is [ $SS_normal_count ]"
 
-if [ "x$SS_otherPort1_count" != 'x1' ]
+if [ "x$SS_normal_count" != 'x1' ]
 then
-    logs "SS on port $otherPort1 has down, restart it!"
-    /opt/shadowsocks-libev/bin/ss-server -s $hostIP -p $otherPort1 -k $ssKey -m aes-128-cfb -f /tmp/.shadowsocks_$otherPort1.pid
+    logs "SS on port $ss_port_normal has down, restart it!"
+    # /opt/shadowsocks-libev/bin/ss-server -s 66.42.73.37 -p 443 -k xyjrgss15jqd4f -m aes-128-cfb -f /tmp/.shadowsocks_8001.pid
+    $ss_bin -s $ss_listenAddr -p $ss_port_normal -k $ss_password -m $ss_encryption -f /tmp/.${ss_pidFile_normal}
 
-    SS_otherPort1_count_new=`ps -ef | grep ss-server | grep shadowsocks_$otherPort1.pid | wc -l`
-    if [ "x$SS_otherPort1_count_new" != 'x1' ]
+    SS_normal_count_new=`ps -ef | grep ss-server | grep $ss_pidFile_normal | wc -l`
+    if [ "x$SS_normal_count_new" != 'x1' ]
     then
-        logs "Failed to start the SS on prot $otherPort1, please check"
+        logs "Failed to start the SS on prot $ss_port_normal, please check"
     else
-        logs "SS on port $otherPort1 has started successfully"
+        logs "SS on port $ss_port_normal has started successfully"
     fi
 else
-    logs "SS on port $otherPort1 is running fine"
+    logs "SS on port $ss_port_normal is running fine"
 fi
