@@ -45,7 +45,6 @@ logs "The process count for port $ss_port_v2ray is [ $SS_v2ray_count ]"
 if [ "x$SS_v2ray_count" != 'x1' ]
 then
     logs "SS on port $ss_port_v2ray has down, restart it!"
-    # /opt/shadowsocks-libev/bin/ss-server -s 66.42.73.37 -p 80 -k xyjrgss15jqd4f -m aes-128-cfb --plugin /opt/v2ray-plugin/v2ray-plugin --plugin-opts server -f /tmp/.shadowsocks_80.pid
     $ss_bin -s $ss_listenAddr -p $ss_port_v2ray -k $ss_password -m $ss_encryption --plugin $ss_plugin --plugin-opts $ss_pluginOpt -f /tmp/.${ss_pidFile_v2ray}
 
     SS_v2ray_count_new=`ps -ef | grep ss-server | grep $ss_pidFile_v2ray | wc -l`
@@ -66,7 +65,6 @@ logs "The process count for port $ss_port_normal is [ $SS_normal_count ]"
 if [ "x$SS_normal_count" != 'x1' ]
 then
     logs "SS on port $ss_port_normal has down, restart it!"
-    # /opt/shadowsocks-libev/bin/ss-server -s 66.42.73.37 -p 443 -k xyjrgss15jqd4f -m aes-128-cfb -f /tmp/.shadowsocks_8001.pid
     $ss_bin -s $ss_listenAddr -p $ss_port_normal -k $ss_password -m $ss_encryption -f /tmp/.${ss_pidFile_normal}
 
     SS_normal_count_new=`ps -ef | grep ss-server | grep $ss_pidFile_normal | wc -l`
