@@ -22,27 +22,25 @@ echo "-- this script will backup and droping object which belongs to oid [${oid}
 
 echo "generating the sql to checking content of catalog table"
 echo "-- check the content of catalog table" >> $sql_file
-echo "SELECT * from pg_class where oid=${oid};" >> $sql_file
-echo "SELECT * from pg_attribute where attrelid = ${oid};" >> $sql_file
-echo "SELECT * from pg_type where typrelid = ${oid};" >> $sql_file
-echo "SELECT * from pg_index where indrelid = ${oid};" >> $sql_file
+echo "SELECT * from pg_class where oid in (${oid});" >> $sql_file
+echo "SELECT * from pg_attribute where attrelid in (${oid});" >> $sql_file
+echo "SELECT * from pg_type where typrelid in ( ${oid} );" >> $sql_file
+echo "SELECT * from pg_index where indrelid in ( ${oid} );" >> $sql_file
 
 ### backup the table ###
 echo "generating the sql to backup the object"
 echo "-- backup the catalog table" >> $sql_file
-echo "copy (SELECT oid,* from pg_class where oid=${oid} ) to '${backup_folder}/pg_class.txt' ;" >> $sql_file
-echo "copy (SELECT * from pg_attribute where attrelid = ${oid} ) to '${backup_folder}/pg_attribute.txt' ;" >> $sql_file
-echo "copy (SELECT oid,* from pg_type where typrelid = ${oid} ) to '${backup_folder}/pg_type.txt' ;" >> $sql_file
-echo "copy (SELECT * from pg_index where indrelid = ${oid} ) to '${backup_folder}/pg_class.txt' ;" >> $sql_file
+echo "copy (SELECT oid,* from pg_class where oid in (${oid}) ) to '${backup_folder}/pg_class.txt' ;" >> $sql_file
+echo "copy (SELECT * from pg_attribute where attrelid in (${oid}) ) to '${backup_folder}/pg_attribute.txt' ;" >> $sql_file
+echo "copy (SELECT oid,* from pg_type where typrelid in ( ${oid} ) ) to '${backup_folder}/pg_type.txt' ;" >> $sql_file
+echo "copy (SELECT * from pg_index where indrelid in ( ${oid} ) ) to '${backup_folder}/pg_index.txt' ;" >> $sql_file
 
 ### delete the content 
 echo "generating the sql to backup the object to delete the content"
 
 echo "-- delete the objects belongs to oid [$oid]" >> $sql_file
 echo "set allow_system_table_mods to dml;" >> $sql_file
-echo "delete from pg_class where oid=${oid};"  >> $sql_file
-echo "delete from pg_attribute where attrelid = ${oid};" >> $sql_file
-echo "delete from pg_type where typrelid = ${oid};"  >> $sql_file
-echo "delete from pg_index where indrelid = ${oid};"  >> $sql_file
-
-
+echo "delete from pg_class where oid in (${oid});"  >> $sql_file
+echo "delete from pg_attribute where attrelid in (${oid});" >> $sql_file
+echo "delete from pg_type where typrelid in ( ${oid} );"  >> $sql_file
+echo "delete from pg_index where indrelid in ( ${oid} );"  >> $sql_file
