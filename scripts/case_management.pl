@@ -95,7 +95,7 @@ sub generate_case_report
         }
         $count++;
     }
-    system("open $report_file");
+    system("open -a \"/Applications/Sublime Text.app/Contents/MacOS/sublime_text\" $report_file");
     return 0;
 }
 
@@ -114,6 +114,9 @@ https://community.pivotal.io/s/article/How-to-Collect-Core-Files-for-Analysis
 
 3. Please collect the minirepro of the query
 https://community.pivotal.io/s/article/How-to-Collect-DDL-and-Statistics-Information-Using-the-Minirepro-Utility
+
+4. To analyze a hung session:
+https://community.pivotal.io/s/article/Analyze-Session-Tool-Automates-Debug-Tracing-for-Hung-Greenplum-Sessions?language=en_US
 ";
 
     if ($case)
@@ -190,7 +193,8 @@ sub find_case_update
 
     if (-f $case_update_file)
     {
-        system("open $case_update_file");
+        my $cmd = qq(open -a "/Applications/Sublime Text.app/Contents/MacOS/sublime_text" $case_update_file);
+        system($cmd);
     }
     else
     {
@@ -309,7 +313,7 @@ llogs
         open OUTPUT,'>',$file;
         print OUTPUT "$case_update";
         close OUTPUT;
-        system("open $file");
+        system("open -a \"/Applications/Sublime Text.app/Contents/MacOS/sublime_text\" $file");
     }
 
 }
