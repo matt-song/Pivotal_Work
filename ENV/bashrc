@@ -15,6 +15,7 @@ alias list='~/scripts/get_host_list.sh'
 alias ll='ls -lG'
 alias c='bash ~/scripts/run_c_program.sh'
 alias km='ssh root@km'
+alias home='bash /Users/xsong/scripts/go_to_ubuntu_vm.sh'
 
 ### case management ###
 alias sf='perl ~/scripts/case_management.pl -t template'
