@@ -3,7 +3,8 @@
 today=`date +%F`
 home_folder='/Users/xsong/Documents/Work'
 archive_folder="${home_folder}/999_Archive"
-target_folder_list='01_Cases 02_Jira 03_Others'
+target_folder_list='01_Cases 02_Jira'
+# target_folder_list='01_Cases 02_Jira 03_Others'
 
 ### create target backup folder ###
 mkdir -pv "${archive_folder}/${today}"
