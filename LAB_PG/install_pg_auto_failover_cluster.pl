@@ -9,6 +9,7 @@ Features:
 - Work for vmware postgres only
 - postgres user must have sudo privilege
 - if failed, fix the error and re-run the script
+- tested on CentOS7 Only
 
 Workflow:
 1. cleanup all the old rpm of postgres
@@ -21,6 +22,18 @@ Workflow:
 7. update the bashrc
 8. validation
 
+VMWare Postgres version has been tested: 
+ > vmware-postgres-10.17-0.el7.x86_64.rpm
+ > vmware-postgres-11.12-0.el7.x86_64.rpm
+ > vmware-postgres-12.7-0.el7.x86_64.rpm
+ > vmware-postgres-13.3-0.el7.x86_64.rpm
+ > vmware-postgres10-10.23-1.el7.x86_64.rpm
+ > vmware-postgres11-11.19-1.el7.x86_64.rpm
+ > vmware-postgres12-12.14-1.el7.x86_64.rpm
+ > vmware-postgres13-13.10-1.el7.x86_64.rpm
+ > vmware-postgres14-14.7-1.el7.x86_64.rpm
+ > vmware-postgres15-15.2-1.el7.x86_64.rpm
+
 Update:
 - 2023.03.28 first draft
 - 2023.04.05 adding code to update ~/.bashrc file after new setup
@@ -31,6 +44,7 @@ use Data::Dumper;
 use Term::ANSIColor;
 use Getopt::Std;
 use File::Basename;
+# use Switch;
 my %opts; getopts('hf:Dym:d:', \%opts);
 my $monitorHost = $opts{'m'};
 my $dataNodeHosts = $opts{'d'};
@@ -155,7 +169,7 @@ $binaryLocation->{'pgAutoctlBin'} create monitor \\\
     {
         ECHO_INFO("Creating datanode on host [$host]...");
    
-        ECHO_INFO("create the folder for PGDATA on host [$host]...");
+        ECHO_INFO("Creating the folder for PGDATA on host [$host]...");
         my $baseFolder=dirname($dataNodeDataFolder);
         my $cmd_CreateFolder = qq(sudo mkdir -pv $dataNodeDataFolder; sudo chown -R $pgUser:$pgUser $baseFolder);
         run_command(qq(ssh ${pgUser}\@${host} "$cmd_CreateFolder"), 1);
@@ -202,9 +216,9 @@ sub doThePreCheck
     $clusterInfo->{'monitorHost'} =  $monitorHost;
     $clusterInfo->{'package'} = basename($installationFile);
 
-    if ($clusterInfo->{'package'} =~ /^vmware-postgres(\d+)-(\d+\.\d+)-1.el7.x86_64.rpm$/)
+    if ($clusterInfo->{'package'} =~ /^vmware-postgres(\d*)-(\d+\.\d+)-\d.*rpm$/)
     {
-        $clusterInfo->{'majorVer'}=$1;
+        $clusterInfo->{'majorVer'}=$1;  ## not used, just keep it here...
         $clusterInfo->{'pgVersion'}=$2;
 
     }
@@ -257,7 +271,7 @@ sub cleanUp
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {removeConfigFolder($_);};
 
     deleteOldPgDataFolder($clusterInfo->{'monitorHost'}, $monitorDataFolder);
-    foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {deleteOldPgDataFolder($_, $dataNodeHosts );};
+    foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {deleteOldPgDataFolder($_, $dataNodeDataFolder );};
 
     ## check if the host is able to connect and able to sudo
     sub testSudo
@@ -326,23 +340,94 @@ sub findBinLocation
     my $version = shift;
     my $result = {};
     
-    ## find out the correct binary location, since 13.4 the location changed
-    ## doc: https://postgres.docs.pivotal.io/13-4/release-notes.html
+    ## find out the correct binary location, since some version the location changed
+    ## doc13: https://postgres.docs.pivotal.io/13-4/release-notes.html
+    ## doc12: https://docs.vmware.com/en/VMware-Postgres/12.8/pg-rpm-12.8.pdf
+    ## doc11: https://docs.vmware.com/en/VMware-Postgres/11.13/pg-rpm-11.13.pdf
+    ## doc10: https://postgres.docs.pivotal.io/10-18/release-notes.html
+
     my ($majorVer, $minorVer) = split(/\./,$version);
     ECHO_DEBUG("version: $version: [$majorVer], [$minorVer]");
+    ### to avoid the compatibility issue in different perl version, I will not using switch here.
     if ($majorVer >= 14)
     {
         $result->{'pgAutoctlBin'} = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
         $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
-    }elsif(($majorVer == 13)&&($minorVer >= 4))
+    }
+    else
+    {
+        if ($majorVer == 13)
+        { 
+            if($minorVer >= 4)
+            {
+                $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+            }
+            else
+            {
+                $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
+            }
+        }
+        elsif ($majorVer == 12)
+        {
+            if($minorVer >= 8)
+            {
+                $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+            }
+            else
+            {
+                $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
+            }
+        }
+        elsif ($majorVer == 11)
+        {
+            if($minorVer >= 13)
+            {
+                $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+            }
+            else
+            {
+                $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
+            }
+        }
+        elsif ($majorVer == 10)
+        {
+            if($minorVer >= 18)
+            {
+                $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+            }
+            else
+            {
+                $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+                $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
+            }
+        }
+        else 
+        { 
+            ECHO_SYSTEM("[WARNING] The version [$version] you are trying to install has not been tested yet, it might not work!!");
+            $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+            $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
+        }
+    }
+=old  
+    if(($majorVer == 13)&&($minorVer >= 4))
     {
         $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
         $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
     }else
     {
-        $result->{'pgAutoctlBin'}  = "/usr/pgsql-$majorVer/bin/pg_autoctl";
-        $result->{'pgCtlBin'}  = "/usr/pgsql-$majorVer/bin/pg_ctl";
+        #$result->{'pgAutoctlBin'}  = "/usr/pgsql-$majorVer/bin/pg_autoctl";
+        # $result->{'pgCtlBin'}  = "/usr/pgsql-$majorVer/bin/pg_ctl";
+        $result->{'pgAutoctlBin'}  = "/usr/bin/pg_autoctl";
+        $result->{'pgCtlBin'}  = "/usr/bin/pg_ctl";
     }
+=cut
     ECHO_DEBUG("Location of pg_auto_failover binary is [$result->{'pgAutoctlBin'}], pg_ctl is [$result->{'pgCtlBin'}]");
     return $result;
 }
@@ -400,12 +485,13 @@ WantedBy = multi-user.target
         open SvcFile,'>',"${workDir}/PgAutoFailoverServiceConf.txt" or do {ECHO_ERROR("unable to create file [${workDir}/PgAutoFailoverServiceConf.txt], exit!",1)};
         print SvcFile $config;
         close SvcFile;
-
-        ### backup the config file first
-        ECHO_INFO("Backup [$PgAutoFailoverServiceConf] to [${tempFolder}]...");
+        
         my $fileName = basename($PgAutoFailoverServiceConf);
-        my $cmd_BackupServiceConifg = qq([ -f $PgAutoFailoverServiceConf ] && sudo mv $PgAutoFailoverServiceConf ${tempFolder}${fileName}.bak.`date +\%F_\%H-\%M-\%S` || echo "No such file [$PgAutoFailoverServiceConf], skip");
-        run_command(qq(ssh ${pgUser}\@${host} "$cmd_BackupServiceConifg"),1);
+
+        ### remove those code, no need to backup the old config since we will delete everything
+        # ECHO_INFO("Backup [$PgAutoFailoverServiceConf] to [${tempFolder}]...");
+        # my $cmd_BackupServiceConifg = qq([ -f $PgAutoFailoverServiceConf ] && sudo mv $PgAutoFailoverServiceConf ${tempFolder}/${fileName}.bak.`date +\%F_\%H-\%M-\%S` || echo "No such file [$PgAutoFailoverServiceConf], skip");
+        # run_command(qq(ssh ${pgUser}\@${host} "$cmd_BackupServiceConifg"),1);
 
         ECHO_INFO("Updating [$PgAutoFailoverServiceConf]...");
         my $cmd_ScpServiceConifg = qq(scp ${workDir}/PgAutoFailoverServiceConf.txt ${pgUser}\@${host}:$tempFolder/$fileName);
@@ -415,8 +501,6 @@ WantedBy = multi-user.target
         run_command( qq(ssh ${pgUser}\@${host} "$cmd_UpdateServiceConifg"),1 );
     }
 }
-
-
 
 sub print_help
 {
@@ -437,7 +521,6 @@ Parameters:
 ");
     exit 1;
 }
-
 
 sub user_confirm
 {
