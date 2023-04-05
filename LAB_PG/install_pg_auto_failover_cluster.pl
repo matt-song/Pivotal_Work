@@ -4,7 +4,7 @@
 Author:         Matt Song
 Creation Date:  2023.03.28
 
-Description: 
+Features:
 - Automatically set up a pg_auto_failover cluster Postgres
 - Work for vmware postgres only
 - postgres user must have sudo privilege
@@ -18,11 +18,12 @@ Workflow:
 4. create the monitor 
 5. create the data node
 6. do some post settings after install
-7. validation
+7. update the bashrc
+8. validation
 
 Update:
 - 2023.03.28 first draft
-
+- 2023.04.05 adding code to update ~/.bashrc file after new setup
 #############################################################################
 =cut
 use strict;
@@ -41,16 +42,15 @@ my $DEBUG = $opts{'D'};
 my $pgUser = 'postgres';
 my $monitorDataFolder = "/data/monitor";
 my $dataNodeDataFolder = "/data/database";
+# my $baseBackupDir= "/data/backup"; ## this is for pg_autoctl replication, see: https://pg-auto-failover.readthedocs.io/en/latest/ref/configuration.html
 my @pgAutoFailoverConfFolder = ('~/.config', '~/.local');
 my $tempFolder = '/tmp';
 my $workDir = "/tmp/setup_pg_auto_failover.$$";
 my $PgAutoFailoverServiceConf = '/etc/systemd/system/pgautofailover.service';
+my $bashrcInclude = "/home/postgres/.bashrc_auto_failover";
 
 
 print_help() if $opts{'h'};
-
-
-
 
 ## Step01: check the input parameters
 my $clusterInfo = doThePreCheck();
@@ -62,13 +62,131 @@ cleanUp($clusterInfo);
 installPgAutoFailoverOnAllHosts($clusterInfo);
 
 ## step04: create the cluster
-# createPgAutoFailoverCluster($clusterInfo)
+createPgAutoFailoverCluster($clusterInfo);
+
+## Step05: post setup
+postSetup($clusterInfo);
 
 ## clean up
 run_command("rm -rf $workDir",1) if ( -d $workDir);
 
+sub postSetup
+{
+    my $clusterInfo = shift;
+    my $binaryLocation = findBinLocation($clusterInfo->{'pgVersion'});
+    my $path=dirname($binaryLocation->{'pgCtlBin'});
 
+    updateBashrc($clusterInfo->{'monitorHost'}, $monitorDataFolder);
+    foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {updateBashrc($_, $dataNodeDataFolder);};
 
+    ## checking if we have ~/.bashrc updated
+    sub updateBashrc
+    {
+        my ($host,$pgdata) = @_;
+        ECHO_INFO("Update bashrc file for host [$host]...");
+        my $cmd_CheckBashrc=qq( cat ~/.bashrc | grep $bashrcInclude | grep -w "\." |wc -l);
+        my $result = run_command(qq(ssh ${pgUser}\@$host "$cmd_CheckBashrc"),1);
+
+        if ($result->{'output'} >= 1)
+        {
+            my $content = qq(echo -e 'export PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            run_command(qq(ssh ${pgUser}\@$host "$content"),1); 
+        }
+        else
+        {
+            my $contentBashrc = qq(echo -e '### pg_auto_failover environment\\nif [ -f $bashrcInclude ]; then\\n    . $bashrcInclude\\nfi' >> ~/.bashrc); 
+            run_command(qq(ssh ${pgUser}\@$host "$contentBashrc"),1); 
+            my $contentExtraBashrc = qq(echo -e 'export PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            run_command(qq(ssh ${pgUser}\@$host "$contentExtraBashrc"),1); 
+        }
+    }
+}
+
+sub createPgAutoFailoverCluster
+{
+    my $clusterInfo = shift;
+    my $binaryLocation = findBinLocation($clusterInfo->{'pgVersion'});
+    my $retry=5; ### retry some times to let service fully up
+
+    ECHO_INFO("create the folder for PGDATA on monitor host [$clusterInfo->{'monitorHost'}]...");
+    my $baseFolder=dirname($monitorDataFolder);
+    my $cmd_CreateFolder = qq(sudo mkdir -pv $monitorDataFolder; sudo chown -R $pgUser:$pgUser $baseFolder);
+    run_command(qq(ssh ${pgUser}\@$clusterInfo->{'monitorHost'} "$cmd_CreateFolder"), 1);
+
+    ### create the monitor ###
+    ECHO_INFO("Creating the monitor on host [$clusterInfo->{'monitorHost'}]...");
+    my $cmd_CreateMonitorNode = qq(
+$binaryLocation->{'pgAutoctlBin'} create monitor \\\
+--auth trust \\\
+--ssl-self-signed \\\
+--pgdata $monitorDataFolder \\\
+--hostname $clusterInfo->{'monitorHost'} \\\
+--pgctl $binaryLocation->{'pgCtlBin'}
+);
+    ## ECHO_SYSTEM("$cmd_CreateMonitorNode");
+    run_command (qq(ssh ${pgUser}\@$clusterInfo->{'monitorHost'} "$cmd_CreateMonitorNode"),1);
+
+    ECHO_INFO("Starting pg_auto_failover service on host [$clusterInfo->{'monitorHost'}]...");
+    run_command(qq(ssh ${pgUser}\@$clusterInfo->{'monitorHost'} "sudo systemctl daemon-reload; sudo systemctl enable pgautofailover; sudo systemctl start pgautofailover"),1);
+    ECHO_INFO("Checking the status of monitor...");
+    sleep(3); ## wait for monitor start
+    ### verify ###
+    foreach my $i (1..$retry)
+    {
+        my $result=run_command(qq(ssh ${pgUser}\@$clusterInfo->{'monitorHost'}  "PGDATA=/data/monitor $binaryLocation->{'pgAutoctlBin'} show state &>/dev/null"));
+        if ( $result->{'code'} != 0) 
+        {
+            if ($i < $retry)
+            {
+                ECHO_SYSTEM("Monitor has not started yet, retrying [ $i / $retry ]..");
+                sleep(1);
+                $retry++;
+            }else{
+                ECHO_ERROR("Monitor can not start, something goes wrong, please review the logs and fix the issue, then try again",1) unless ($result->{'code'} == 0);
+            }
+        }else{
+            ECHO_INFO("Monitor created successfully");
+            last;
+        }
+    }
+    ### Create the data node ###
+    my $monitor=${clusterInfo}->{'monitorHost'};
+    foreach my $host (split(/,/,$clusterInfo->{'dataNodeList'}) )
+    {
+        ECHO_INFO("Creating datanode on host [$host]...");
+   
+        ECHO_INFO("create the folder for PGDATA on host [$host]...");
+        my $baseFolder=dirname($dataNodeDataFolder);
+        my $cmd_CreateFolder = qq(sudo mkdir -pv $dataNodeDataFolder; sudo chown -R $pgUser:$pgUser $baseFolder);
+        run_command(qq(ssh ${pgUser}\@${host} "$cmd_CreateFolder"), 1);
+        
+        my $cmd_CreateDataNode = qq(
+$binaryLocation->{'pgAutoctlBin'} create postgres \\\
+--pgdata $dataNodeDataFolder \\\
+--auth trust \\\
+--ssl-self-signed \\\
+--username postgres \\\
+--hostname $host \\\
+--pgctl $binaryLocation->{'pgCtlBin'} \\\
+--monitor 'postgres://autoctl_node\@$monitor:5432/pg_auto_failover?sslmode=require' \\\
+--dbname postgres  
+);
+        ## ECHO_SYSTEM($cmd_CreateDataNode);
+        run_command(qq(ssh ${pgUser}\@${host} "$cmd_CreateDataNode"),1);
+        run_command(qq(ssh ${pgUser}\@${host} "sudo systemctl daemon-reload; sudo systemctl enable pgautofailover; sudo systemctl start pgautofailover"),1);
+    }
+
+    ### validation ###
+    ECHO_INFO("Setup has completed, checking the status of the cluster...");
+    sleep(3); ### wait for standby syncup with leader
+    ECHO_SYSTEM("
+###############################################################################
+VMWare pg_auto_failover cluster [$clusterInfo->{'pgVersion'}] has been installed, here is the result:
+###############################################################################
+");
+    my $result=run_command(qq(ssh ${pgUser}\@$clusterInfo->{'monitorHost'}  "PGDATA=/data/monitor $binaryLocation->{'pgAutoctlBin'} show state"));
+    ECHO_SYSTEM($result->{'output'});
+}
 
 sub doThePreCheck
 {
@@ -95,11 +213,15 @@ sub doThePreCheck
         ECHO_ERROR("Unable to determine the version of postgres, please check the file and try again", 1);
     }
     ECHO_SYSTEM("
-Installation Summary: 
+##############################################
+PG_AUTO_FAILOVER Cluster Installation Summary: 
+##############################################
 
-Target Version: $clusterInfo->{'pgVersion'}
-Monitor host:   [$monitorHost],\tPGDATABASE: [$monitorDataFolder]
-DataNode host:  [$clusterInfo->{'dataNodeList'}],\tPGDATABASE: [$dataNodeDataFolder]
+Target Version:    \t[$clusterInfo->{'pgVersion'}]
+Monitor host:      \t[$monitorHost]
+Moniotr's PGDATA:  \t[$monitorDataFolder]
+DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
+DataNode's PGDATA: \t[$dataNodeDataFolder]
 
 !!! WARNNING !!!
 Once you choose to continue, We will delete all the content in above folder, and will also destroy the previous pg_auto_ctl cluster (if exsits)
@@ -109,10 +231,11 @@ There is NO ROLLBACK! Please proceed with cautions!
     # print Dumper $clusterInfo;
 =comment
 $VAR1 = {
-          'monitorHost' => 'paf-m',
-          'majorVer' => '15',
-          'pgVersion' => '15.2',
-          'dataNodeList' => 'paf-n1,paf-n2'
+          'pgVersion' => '13.8',
+          'monitorHost' => 'monitor',
+          'package' => 'vmware-postgres13-13.8-1.el7.x86_64.rpm',
+          'majorVer' => '13',
+          'dataNodeList' => 'node1,node2'
         };
 =cut
     return $clusterInfo;
@@ -133,6 +256,9 @@ sub cleanUp
     removeConfigFolder($clusterInfo->{'monitorHost'});
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {removeConfigFolder($_);};
 
+    deleteOldPgDataFolder($clusterInfo->{'monitorHost'}, $monitorDataFolder);
+    foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {deleteOldPgDataFolder($_, $dataNodeHosts );};
+
     ## check if the host is able to connect and able to sudo
     sub testSudo
     {
@@ -145,6 +271,11 @@ sub cleanUp
     sub stopAutoFailverService
     {
         my $host = shift;
+
+        ### clean up old bashrc file
+        my $cmd_deleteBashrc = qq([ -f $bashrcInclude ] && rm -f $bashrcInclude || echo "File not found [$bashrcInclude], skip..." );
+        run_command(qq(ssh ${pgUser}\@${host} "$cmd_deleteBashrc"),1);
+
         ECHO_INFO("Stopping the pg_auto_failover service on host [$host]...");
         my $cmd_stopAutoFailoverService = q(sudo systemctl stop pgautofailover);
         run_command(qq(ssh ${pgUser}\@${host} "$cmd_stopAutoFailoverService"));
@@ -158,6 +289,7 @@ sub cleanUp
     {
         my $host = shift;
         ECHO_INFO("cleanup previous installed vmware postgres rpm package on host [$host]..");
+
         ##### note: adding echo here to eliminate unnecessary error, sort the output to let other package (like vmware-postgres13-devel-13.8-1.el7.x86_64) been removed first
         my $cmd_rpmQuery = qq(rpm -qa | grep vmware-postgres | sort -r || echo "");   
         my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
@@ -177,10 +309,42 @@ sub cleanUp
         foreach my $folder (@pgAutoFailoverConfFolder)
         {
             my $cmd_deleteConfig = qq([ -d $folder ] && rm -rf $folder || echo "No such folder [$folder]");
-            my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_deleteConfig"));
+            my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_deleteConfig"),1 );
         }
-
     }
+    sub deleteOldPgDataFolder
+    {
+        my ($host, $folder) = @_;
+        ECHO_INFO("Deleting PGDATA [$folder] on host [$host]...");
+        my $cmd_DeletePGData = qq([ -d $folder ] && sudo rm -rf $folder || echo "no such folder [$folder], skip");
+        run_command(qq(ssh ${pgUser}\@${host} "$cmd_DeletePGData"),1 );
+    }
+}
+
+sub findBinLocation
+{
+    my $version = shift;
+    my $result = {};
+    
+    ## find out the correct binary location, since 13.4 the location changed
+    ## doc: https://postgres.docs.pivotal.io/13-4/release-notes.html
+    my ($majorVer, $minorVer) = split(/\./,$version);
+    ECHO_DEBUG("version: $version: [$majorVer], [$minorVer]");
+    if ($majorVer >= 14)
+    {
+        $result->{'pgAutoctlBin'} = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+        $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+    }elsif(($majorVer == 13)&&($minorVer >= 4))
+    {
+        $result->{'pgAutoctlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
+        $result->{'pgCtlBin'}  = "/opt/vmware/postgres/$majorVer/bin/pg_ctl";
+    }else
+    {
+        $result->{'pgAutoctlBin'}  = "/usr/pgsql-$majorVer/bin/pg_autoctl";
+        $result->{'pgCtlBin'}  = "/usr/pgsql-$majorVer/bin/pg_ctl";
+    }
+    ECHO_DEBUG("Location of pg_auto_failover binary is [$result->{'pgAutoctlBin'}], pg_ctl is [$result->{'pgCtlBin'}]");
+    return $result;
 }
 
 sub installPgAutoFailoverOnAllHosts
@@ -205,6 +369,9 @@ sub installPgAutoFailoverOnAllHosts
         ECHO_INFO(qq(Installing [$rpm] on server [$host]...));
         my $cmd_installRpm = qq(sudo yum -y install ${tempFolder}/$rpm);
         run_command(qq(ssh ${pgUser}\@${host} "$cmd_installRpm"),1);
+
+        ## clean up the temp installation file 
+        run_command(qq(ssh ${pgUser}\@${host} "[ -f ${tempFolder}/$rpm ] && rm -f ${tempFolder}/$rpm || echo 'file not found [${tempFolder}/$rpm], skip' "),1);
     }
 
     sub updateOSServiceConfig 
@@ -212,23 +379,8 @@ sub installPgAutoFailoverOnAllHosts
         my ($host,$version,$pgDataFolder )= @_;
         
         ECHO_INFO(qq(updating [$PgAutoFailoverServiceConf] on host [$host]...));
-        
-        ## find out the correct binary location, since 13.4 the location changed
-        ## doc: https://postgres.docs.pivotal.io/13-4/release-notes.html
-        my $pgAutoctlBin;
-        my ($majorVer, $minorVer) = split(/\./,$version);
-        ECHO_DEBUG("version: $version: [$majorVer], [$minorVer]");
-        if ($majorVer >= 14)
-        {
-            $pgAutoctlBin = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
-        }elsif(($majorVer == 13)&&($minorVer >= 4))
-        {
-            $pgAutoctlBin = "/opt/vmware/postgres/$majorVer/bin/pg_autoctl";
-        }else
-        {
-            $pgAutoctlBin = "/usr/pgsql-$majorVer/bin/pg_autoctl";
-        }
-        ECHO_DEBUG("Location of pg_auto_failover binary is [$pgAutoctlBin]");
+        my $binaryLocation = findBinLocation($version);
+
         my $config=qq(
 [Unit]
 Description = pg_auto_failover
@@ -237,7 +389,7 @@ Description = pg_auto_failover
 WorkingDirectory = /home/postgres
 Environment = 'PGDATA=$pgDataFolder'
 User = postgres
-ExecStart = $pgAutoctlBin run
+ExecStart = $binaryLocation->{'pgAutoctlBin'} run
 Restart = always
 StartLimitBurst = 0
 
@@ -281,6 +433,7 @@ Parameters:
     -d datanode list, separate with comma
     -h print this message
     -D enable debug mode
+    -y answer yes automatically
 ");
     exit 1;
 }
