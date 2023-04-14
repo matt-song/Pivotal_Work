@@ -117,6 +117,9 @@ https://community.pivotal.io/s/article/How-to-Collect-DDL-and-Statistics-Informa
 
 4. To analyze a hung session:
 https://community.pivotal.io/s/article/Analyze-Session-Tool-Automates-Debug-Tracing-for-Hung-Greenplum-Sessions?language=en_US
+
+5. To enable core dump on the server
+https://community.pivotal.io/s/article/how-to-enable-core-generation-on-a-server?language=en_US
 ";
 
     if ($case)
