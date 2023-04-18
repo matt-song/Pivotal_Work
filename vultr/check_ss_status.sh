@@ -18,7 +18,7 @@ ss_port_normal='8001'
 ss_encryption='aes-128-gcm'
 ss_plugin='/opt/v2ray-plugin/v2ray-plugin'
 ss_pluginOpt='server'
-ss_listenAddr=`ip a | grep eth0 | grep inet | awk '{print $2}' | sed 's/\/.*//g'`
+ss_listenAddr=`/usr/sbin/ip a | grep eth0 | grep inet | awk '{print $2}' | sed 's/\/.*//g'`
 ss_pidFile_v2ray="shadowsocks_${ss_port_v2ray}.pid"
 ss_pidFile_normal="shadowsocks_${ss_port_normal}.pid"
 
