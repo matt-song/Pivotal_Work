@@ -96,6 +96,7 @@ then
         ### get the gphome and master data folder's usage ###
         GPHOME_Usage=`du -s $GP_HOME/$build | awk '{print $1}'`
         MASTER_Usage=`du -s $GP_DATA_MASTER/master_${gp_ver} | awk '{print $1}'`
+        [ "x$MASTER_Usage" = 'x' ] && MASTER_Usage=0    ## workaround for HW issue
         total_usage=$(($GPHOME_Usage+$MASTER_Usage))
 
         ECHO_DEBUG "GP version: [$gp_ver], Master folder: [$master_data] and usage: [$MASTER_Usage]; GPHOME: [$GP_HOME/$build]"
@@ -146,7 +147,13 @@ else
         isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
-        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ]"
+        ## check the last log time ##
+        source ${GP_HOME}/${build}/greenplum_path.sh
+	log_file=`find $MASTER_DATA_DIRECTORY/pg_log/ -size +0 | grep gpdb- | tail -1`; 
+        # echo "DEBUG: logfile is [$log_file]"
+        last_log_date=`tail -200 $log_file | grep "^[0-9]*-[0-9]*-[0-9]* "|tail -1 | awk '{print $1,$2}' | sed 's/\..*//g'`
+
+        echo -e "    Build: [ ${yellow}${GP_HOME}/${build}${normal} ] \t Port: [ ${yellow}$gp_port${normal} ]   \t Status: [ $status ]   \t Last log time: [${yellow}$last_log_date${normal}]"
     done
     echo ""
 fi

@@ -28,6 +28,9 @@ alias clipboard='killall pboard'
 alias report='perl /Users/xsong/scripts/case_management.pl -t case_report'
 alias pivnet='export http_proxy="socks5://localhost:1086"; export https_proxy="socks5://localhost:1086"; pivnet'
 alias psql='/Library/PostgreSQL/9.6/bin/psql -p 5432 -h aio1 -U gpadmin'
+alias gcp="ssh '-o ServerAliveInterval=5'  gpadmin@gcp-gp7"
+alias logserver="ssh paassupport@tanzu-csp-1.tanzu-gss-labs.vmware.com"
+alias pg="ssh postgres@paf-m"
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;

@@ -7,7 +7,8 @@ log=$1
 for severity in WARN ERROR FATAL
 do 
     echo === $severity ===
-    echo "# cat $log | grep "\\\"$severity\\\"" | awk -F',' '{print \$19}' | sort | uniq -c "
-    cat $log | grep "\"$severity\"" | awk -F',' '{print $19}' | sort | uniq -c
+#    echo "# cat $log | grep "\\\"$severity\\\"" | awk -F',' '{print \$19}' | sort | uniq -c "
+#    cat $log | grep "\"$severity\"" | awk -F',' '{print $19}' | sort | uniq -c
+    cat $log | grep "\"$severity\"" | awk -F',"' '{print $8}' | sed 's/,,.*//g' | sort | uniq -c | sort -nr
     echo 
 done
