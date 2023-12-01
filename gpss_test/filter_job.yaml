@@ -1,0 +1,36 @@
+DATABASE: gpadmin
+USER: gpadmin
+HOST: mdw
+PORT: 5432
+VERSION: 2
+KAFKA:
+    INPUT:
+      SOURCE:
+        BROKERS: 192.168.6.150:9092
+        TOPIC: test_gpss_topic
+      VALUE:
+        COLUMNS:
+          - NAME: id
+            TYPE: int
+          - NAME: t_date
+            TYPE: date
+          - NAME: comment
+            TYPE: text
+        FORMAT: csv
+      ERROR_LIMIT: 10
+      FILTER: now()::date - t_date::date < 30;
+    OUTPUT:
+      TABLE: test_filter_table
+      MODE: INSERT
+      MAPPING:
+        - NAME: id  ## column#1
+          EXPRESSION: id
+        - NAME: t_date  ## column#2
+          EXPRESSION: t_date
+        - NAME: comment  ## column#2
+          EXPRESSION: comment
+    COMMIT:
+      MINIMAL_INTERVAL: 2000
+    TASK:
+      POST_BATCH_SQL: delete from test_filter_table where now()::date - t_date::date > 10;
+      BATCH_INTERVAL: 1

@@ -1,0 +1,84 @@
+DATABASE: gpadmin
+USER: gpadmin
+PASSWORD: abc123
+HOST: mdw
+PORT: 5432
+KAFKA:
+   INPUT:
+     SOURCE:
+        BROKERS: 192.168.6.150:9092
+        TOPIC: test_gpss_topic
+     COLUMNS:
+          - NAME: id
+            TYPE: int
+          - NAME: t_date
+            TYPE: date
+          - NAME: c1
+            TYPE: text
+          - NAME: c2
+            TYPE: text
+          - NAME: c3
+            TYPE: text
+          - NAME: c4
+            TYPE: text
+          - NAME: c5
+            TYPE: text
+          - NAME: c6
+            TYPE: text
+          - NAME: c7
+            TYPE: text
+          - NAME: c8
+            TYPE: text
+          - NAME: c9
+            TYPE: text
+          - NAME: c10
+            TYPE: text
+          - NAME: c11
+            TYPE: text
+          - NAME: c12
+            TYPE: text
+          - NAME: c13
+            TYPE: text
+          - NAME: c14
+            TYPE: text
+     FORMAT: csv
+     ERROR_LIMIT: 10
+   OUTPUT:
+     TABLE: gpss_partition_test
+     MODE: insert
+     MAPPING:
+        - NAME: id
+          EXPRESSION: id
+        - NAME: t_date
+          EXPRESSION: t_date
+        - NAME: c1
+          EXPRESSION: c1
+        - NAME: c2
+          EXPRESSION: c2
+        - NAME: c3
+          EXPRESSION: c3
+        - NAME: c4
+          EXPRESSION: c4
+        - NAME: c5
+          EXPRESSION: c5
+        - NAME: c6
+          EXPRESSION: c6
+        - NAME: c7
+          EXPRESSION: c7
+        - NAME: c8
+          EXPRESSION: c8
+        - NAME: c9
+          EXPRESSION: c9
+        - NAME: c10
+          EXPRESSION: c10
+        - NAME: c11
+          EXPRESSION: c11
+        - NAME: c12
+          EXPRESSION: c12
+        - NAME: c13
+          EXPRESSION: c13
+        - NAME: c14
+          EXPRESSION: c14
+   COMMIT:
+     MINIMAL_INTERVAL: 3000
+     MAX_ROW: 20000

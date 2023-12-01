@@ -1,0 +1,36 @@
+DATABASE: gpadmin
+USER: gpadmin
+HOST: mdw
+PORT: 5432
+VERSION: 2
+FILE:
+   INPUT:
+      SOURCE:
+         URL: file:///data/etl/data_source.csv
+      VALUE:
+         COLUMNS:
+          - NAME: id
+            TYPE: int
+          - NAME: t_date
+            TYPE: date
+          - NAME: comment
+            TYPE: text
+         FORMAT: csv
+      ERROR_LIMIT: 25
+   OUTPUT:
+      SCHEMA: public
+      TABLE: gpss_from_csv
+      MODE: MERGE
+      MATCH_COLUMNS:
+        - id
+      DELETE_CONDITION: now()::date - t_date::date > 30
+      MAPPING:
+        - NAME: id  ## column#1
+          EXPRESSION: id
+        - NAME: t_date  ## column#2
+          EXPRESSION: t_date
+        - NAME: comment  ## column#2
+          EXPRESSION: comment
+SCHEDULE:
+  RETRY_INTERVAL: 500ms
+  MAX_RETRIES: 2
