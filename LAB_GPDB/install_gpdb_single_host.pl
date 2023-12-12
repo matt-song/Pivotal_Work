@@ -6,6 +6,14 @@
 #                                                               #
 # Update @ 2019.08.13: Adding support for GPv6                  #
 #                      along with support for RPM package       #
+#                                                               #
+# Update @ 2023.12.12: Adding support for GPv7                  #
+# Major change:                                                 #
+#   - check the version of target package, if it is gpv7, then  #
+#     1. change the env for master directory                    #
+#     2. change the config file of gpinitsystem                 #
+#     3. change the script for greenplum_path                   #
+#     4. change the command for validate gpdb is running        #
 #################################################################
 use strict;
 use Data::Dumper;
@@ -101,18 +109,19 @@ sub install_gpdb_package
     my $package = shift;
     my $gp_info;
 
-    ECHO_DEBUG("Checking if GPDB is running");
-    &stop_gpdb;
-
-    ### print the settings and ask user to confirm ###
-    ECHO_INFO("Will start to install package [$package], please review below setting");
-    
     my $gp_ver = $1 if ($package =~ /greenplum-db-([\d\.]+)-/);
     my $gp_home = "${gpdp_home_folder}/greenplum_${gp_ver}";
     my $master_folder = "$gpdb_master_home/master_${gp_ver}";
     my $segment_count = $gpdb_segment_num;
     my $segment_folder = "$gpdb_segment_home/segment_${gp_ver}";
 
+    ECHO_DEBUG("Checking if GPDB is running");
+    &stop_gpdb(${gp_ver});
+
+    ### print the settings and ask user to confirm ###
+    ECHO_INFO("Will start to install package [$package], please review below setting");
+    
+    
     ECHO_SYSTEM("
     GPDB Version:           $gp_ver
     GPDB home folder:       $gp_home
@@ -188,12 +197,35 @@ sub install_gpdb_package
     run_command(qq( sed -i 's~GPHOME=\$(dirname "\${SCRIPT_DIR}")/"\${GPDB_DIR}"~GPHOME=${gp_home}~g' $gp_home/greenplum_path.sh),1);
     ### end 
     open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
-    my $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
+    
+    my $line;
+    if ( &is_GPver_Higher_Than_7($gp_ver) )
+    {
+        $line = qq(export COORDINATOR_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
+    }
+    else
+    {
+        $line = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpdb_${gp_ver}_-1');
+    }
     print GP_PATH "$line\n";
     close GP_PATH;
-     
+    
     ECHO_INFO("GPDB package has been successfully installed to [$gp_home]");
     return $gp_info;   
+}
+
+sub is_GPver_Higher_Than_7
+{
+    my $version = shift;
+    my $majorVersion = $1 if ($version =~ /^(\d+)\.\d+\.\d+$/); ## example: 7.0.0 
+    if ($majorVersion >= 7 ) 
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 sub init_gpdb
@@ -255,7 +287,29 @@ sub init_gpdb
     ### initiate the gpdb server ###
     ECHO_INFO("Creating the gpinitsystem_config file to [$gp_home]..");
     open INIT, '>', "$gp_home/gpinitsystem_config" or do {ECHO_ERROR("unable to write file [$gp_home/gpinitsystem_config], exit!",1)};
-    my $gpinitsystem_config = qq(
+    my $gpinitsystem_config;
+    if ( &is_GPver_Higher_Than_7(${gp_ver}) )
+    {
+        $gpinitsystem_config = qq(
+ARRAY_NAME="gpdb_${gp_ver}"
+SEG_PREFIX=gpdb_${gp_ver}_
+PORT_BASE=20000
+$conf_primary
+COORDINATOR_HOSTNAME=$master_hostname
+COORDINATOR_DIRECTORY=$master_folder
+COORDINATOR_PORT=5432
+TRUSTED_SHELL=ssh
+CHECK_POINT_SEGMENTS=8
+ENCODING=UNICODE
+MIRROR_PORT_BASE=21000
+REPLICATION_PORT_BASE=22000
+MIRROR_REPLICATION_PORT_BASE=23000
+$conf_mirror
+);
+    }
+    else
+    {
+        $gpinitsystem_config = qq(
 ARRAY_NAME="gpdb_${gp_ver}"
 SEG_PREFIX=gpdb_${gp_ver}_
 PORT_BASE=20000
@@ -271,6 +325,8 @@ REPLICATION_PORT_BASE=22000
 MIRROR_REPLICATION_PORT_BASE=23000
 $conf_mirror
 );
+    }
+
     ECHO_DEBUG("the gpinitsystem_config file is like below [\n$gpinitsystem_config\n]");
     print INIT "$gpinitsystem_config";
 
@@ -288,7 +344,7 @@ $conf_mirror
     else
     {
         ECHO_INFO("Done! Checking if GPDB with [$gp_ver] has started");
-        my $result = &check_gpdb_isRunning;
+        my $result = &check_gpdb_isRunning(${gp_ver});
         if ($result->{'pid'})
         {
             ECHO_INFO("GPDB has been initialized and started successfully, PID [$result->{'pid'}]");
@@ -331,7 +387,8 @@ sub set_env
 
 sub stop_gpdb
 {
-    my $checking_result = &check_gpdb_isRunning;
+    my $gpdb_version=shift;
+    my $checking_result = &check_gpdb_isRunning(${gpdb_version});
 
     if ($checking_result->{'pid'} == 0)
     {
@@ -360,7 +417,7 @@ sub stop_gpdb
             source $gphome/greenplum_path.sh;
             gpstop -M fast -a | egrep "WARNING|ERROR";) );
 
-            my $result = &check_gpdb_isRunning;
+            my $result = &check_gpdb_isRunning(${gpdb_version});
 
             if ($result->{'pid'} == 0) ## successfully shutdown
             {
@@ -414,10 +471,21 @@ sub user_confirm
 }
 sub check_gpdb_isRunning
 {
+    my $gpdb_ver = shift;
     my $result;
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $result = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    ### tbd: add command for gpdb v7
+    my $command = '';
+    if ( &is_GPver_Higher_Than_7($gpdb_ver) )
+    {
+        $command=qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gpdb_ver | awk '{print \$2","\$8}');
+    }
+    else
+    {
+        $command=qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}');
+    }
+    my $result = run_command($command);
     my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 
