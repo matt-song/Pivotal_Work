@@ -6,6 +6,8 @@
 #                                                               #
 # Update @ 2019.05.02                                           #
 # Now we can run this tool on GPDB cluster :)                   #
+# Update @ 2023.12.18                                           #
+# add support for GPv7                                          #
 #################################################################
 use strict;
 use Term::ANSIColor;
@@ -189,9 +191,14 @@ sub user_confirm
 sub check_gpdb_isRunning
 {
     my $result;
+
+### update at 2023-12-18
+### logic update: 1 check if we have master process. 2. check the version.
+### ps -ef | grep postgres | grep D | grep greenplum-db  | egrep "gp_role=dispatch|\-E"
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $gpdb_proc = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    # my $gpdb_proc = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}'));
+    my $gpdb_proc = run_command(qq(ps -ef | grep postgres | grep D | grep greenplum-db  | egrep "gp_role=dispatch|\\-E" | grep -v sh | awk '{print \$2","\$8}'));
     my ($pid,$gphome) = split(/,/,$gpdb_proc);
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
 
@@ -264,6 +271,3 @@ sub printColor
     my ($Color,$MSG) = @_;
     print color "$Color"; print "$MSG"; print color 'reset';
 }
-
-
-# ls  /opt/ | grep greenplum_
