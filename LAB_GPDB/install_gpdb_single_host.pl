@@ -472,36 +472,44 @@ sub user_confirm
 sub check_gpdb_isRunning
 {
     my $gpdb_ver = shift;
-    my $result;
+    # my $result;
     
-    ECHO_INFO("Checking if GPDB is running...");
-    ### tbd: add command for gpdb v7
-    my $command = '';
-    if ( &is_GPver_Higher_Than_7($gpdb_ver) )
-    {
-        $command=qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gpdb_ver | awk '{print \$2","\$8}');
-    }
-    else
-    {
-        $command=qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}');
-    }
-    my $result = run_command($command);
-    my ($pid,$gphome) = split(/,/,$result->{'output'});
+    ### gpv4,5,6
+    ECHO_INFO("Checking if there is any GPDB v6 cluster is running...");
+    my $command_gpv6=qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}');
+    my $result_v6 = run_command($command_gpv6);
+    my ($pid,$gphome) = split(/,/,$result_v6->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
-
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
     if ($pid =~ /\d+/) ## GPDB is running
     {
         ECHO_INFO("GPDB is running, PID: [$pid], GPHOME: [$gphome]");
-        $result->{'pid'} = $pid;
-        $result->{'gphome'} = $gphome;
-        return $result;
+        $result_v6->{'pid'} = $pid;
+        $result_v6->{'gphome'} = $gphome;
+        return $result_v6;
     }
-    else  ## GPDB is not running
+    else  
     {
-        ECHO_INFO("GPDB is not running");
-        $result->{'pid'} = 0;
-        return $result;
+        ### gpv7+
+        ECHO_INFO("No GPDBv6 found, checking GPDBv7...");
+        my $command_gpv7=qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gpdb_ver | awk '{print \$2","\$8}');
+        my $result_v7 = run_command($command_gpv7);
+        my ($pid,$gphome) = split(/,/,$result_v7->{'output'});
+        ($gphome = $gphome) =~ s/\/bin\/postgres//g;
+        ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");
+        if ($pid =~ /\d+/) 
+        {
+            ECHO_INFO("Found GPDB v7 is running, PID: [$pid], GPHOME: [$gphome]");
+            $result_v7->{'pid'} = $pid;
+            $result_v7->{'gphome'} = $gphome;
+            return $result_v7;
+        }
+        else 
+        {
+            ECHO_INFO("GPDB is not running");
+            $result_v7->{'pid'} = 0;
+            return $result_v7;
+        }
     }
 }
 
