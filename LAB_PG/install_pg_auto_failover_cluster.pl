@@ -115,6 +115,28 @@ sub postSetup
         }
     }
 }
+sub update_monitor_pghba
+{
+    ### hostssl "pg_auto_failover" "autoctl_node" 10.216.2.6/32 trust #
+    my $clusterInfo = shift;
+    
+    ECHO_INFO("Updating monitor's pg_hba.conf...");
+    my $monitor_hostname = $clusterInfo->{'monitorHost'};
+    my $netmask = '16';
+    my $monitor_subnet = run_command(qq(ping monitor -c1 | grep "PING" | awk '{print \$3}' | sed 's/(//g' | sed 's/)//g' | awk -F'.' '{print $1"."$2".0.0"}'), 1);
+    my $pghba_line = qq(hostssl "pg_auto_failover" "autoctl_node" $monitor_subnet->{'output'}/$netmask trust);
+    ECHO_INFO("Adding [$pghba_line] to $monitorDataFolder/pg_hba.conf...");
+    open PGHBA,'>>', "$monitorDataFolder/pg_hba.conf" or do {ECHO_ERROR("unable to append to pg_hba.conf, exit!",1)};
+    print PGHBA "#### updated by installation script, allow work node to connect to mointor \n$pghba_line\n";
+    close PGHBA;
+
+    ECHO_INFO("Reloading mointor...");
+    my $binaryLocation = findBinLocation($clusterInfo->{'pgVersion'});
+    my $PGCTL=$binaryLocation->{'pgCtlBin'};
+    my $cmd_reload_monitor=qq($PGCTL -D $monitorDataFolder reload);
+    run_command($cmd_reload_monitor,1);    
+    ECHO_INFO("Done!");
+}
 
 sub createPgAutoFailoverCluster
 {
@@ -163,6 +185,10 @@ $binaryLocation->{'pgAutoctlBin'} create monitor \\\
             last;
         }
     }
+
+    ### update monitor pg_hba.conf, updated at 2024-01-10
+    update_monitor_pghba($clusterInfo);
+
     ### Create the data node ###
     my $monitor=${clusterInfo}->{'monitorHost'};
     foreach my $host (split(/,/,$clusterInfo->{'dataNodeList'}) )
