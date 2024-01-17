@@ -167,7 +167,7 @@ enable_Archive_On_DataNode()
         isStandby=`ssh $host "pg_controldata $dataNodePGDATA | grep 'Database cluster state:' | grep 'in production' | wc -l"`
         if [ $isStandby -eq 0 ]; then 
             ECHO_SYSTEM "Setting [$host] to maintainence mode..."
-            run_remote_command $host "pg_autoctl enable maintenance"
+            run_remote_command $host "pg_autoctl enable maintenance >/dev/null 2>&1"
         fi 
     done
 
@@ -180,11 +180,18 @@ enable_Archive_On_DataNode()
             ECHO_ERROR "Failed to locate the binary of pgbackrest, please check and try again!"
             exit 1
         fi
-        run_remote_command $host "psql -d $db -c \"alter system set archive_command = '$pgbackrestBin --stanza=$backupStanza archive-push %p';\""
-        run_remote_command $host "psql -d $db -c \"alter system set archive_mode = 'true';\""
+        run_remote_command $host "psql -d $db -qc \"alter system set archive_command = '$pgbackrestBin --stanza=$backupStanza archive-push %p';\""
+        run_remote_command $host "psql -d $db -qc \"alter system set archive_mode = 'true';\""
         
-        ## update pg_hba.conf 
-        run_remote_command $host "echo \"host    all             $pgUser             $subnet            trust\" >> $dataNodePGDATA/pg_hba.conf"
+        ## update pg_hba.conf
+        ECHO_SYSTEM "Updating ${dataNodePGDATA}/pg_hba.conf on host [$host]..." 
+        line="host    all             $pgUser             $subnet            trust"
+        isAlreadyUpdated=`ssh $host "cat $dataNodePGDATA/pg_hba.conf" | grep "$line" | grep -v '#' | wc -l`
+        if [ $isAlreadyUpdated -eq 0 ]; then 
+            run_remote_command $host "echo $line >> $dataNodePGDATA/pg_hba.conf"
+        else 
+            ECHO_WARN "the line [$line] already in pg_hba.conf, skip..."
+        fi 
 
         ## restart pgautofailover
         run_remote_command $host "sudo systemctl restart pgautofailover;"
@@ -198,7 +205,7 @@ enable_Archive_On_DataNode()
         isStandby=`ssh $host "pg_controldata $dataNodePGDATA | grep 'Database cluster state:' | grep 'in production' | wc -l"`
         if [ $isStandby -eq 0 ]; then 
             ECHO_SYSTEM "Setting [$host] to normal mode..."
-            run_remote_command $host "pg_autoctl disable maintenance"
+            run_remote_command $host "pg_autoctl disable maintenance >/dev/null 2>&1"
         fi 
     done
 }
@@ -209,14 +216,24 @@ createStanza()
 
     ### check from node: pgbackrest --stanza=main --log-level-console=info check
 }
-# validate()
-# {
-#
-# }
+validate()
+{
+    ECHO_SYSTEM "Check if the pgbackrest is working..."
+    for host in `echo $data_nodes | sed 's/,/\n/g' | head -1`
+    do
+        run_remote_command $host "pgbackrest --stanza=$backupStanza --log-level-console=info check"
+    done 
+    ECHO_SYSTEM "Looks good, all set now!
+
+you can run below command to start a new backup if needed: 
+"
+    ECHO_WARN "    # pgbackrest --log-level-console=info --stanza=$backupStanza backup
+"
+}
 
 cleanup()
 {
-    ECHO_SYSTEM "Cleanup all temp work file and folder..."
+    # ECHO_SYSTEM "Cleanup all temp work file and folder..."
     if [ -d $workFolder ]; then 
         rm -rf $workFolder
     fi
@@ -228,5 +245,5 @@ prepare                         ## 01: precheck and create the related folder if
 update_pgbackrest_conf          ## 02: generate conf file for pgbackrest
 createStanza                    ## 03: create the Stanza
 enable_Archive_On_DataNode      ## 04: enable the archive on all datanode
-
+validate                        ## 05: validate the pgbackrest is functional
 cleanup                         ## remove the temp work folder
