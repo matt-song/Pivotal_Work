@@ -331,8 +331,9 @@ $conf_mirror
     print INIT "$gpinitsystem_config";
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
+    ### updated at 2024-01-17: clean up LD_LIBRARY_PATH in order to handle error `undefined symbol: ZSTD_compressStream2` 
     my $result = run_command(qq (
-        unset LD_LIBRARY_PATH; source ${gp_home}/greenplum_path.sh; 
+        source ${gp_home}/greenplum_path.sh; export LD_LIBRARY_PATH=; 
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     

@@ -18,19 +18,20 @@ alias km='ssh root@km'
 alias home='bash /Users/xsong/scripts/go_to_ubuntu_vm.sh'
 
 ### case management ###
-alias sf='perl ~/scripts/case_management.pl -t template'
-alias case_finder='perl ~/scripts/case_management.pl -t find -c'
-alias ir='perl /Users/xsong/scripts/case_management.pl -t ir -l'
-alias ircn='perl /Users/xsong/scripts/case_management.pl -t ir -l cn'
-alias eogs='perl /Users/xsong/scripts/case_management.pl -t eogs'
+# alias sf='perl ~/scripts/case_management.pl -t template'
+# alias case_finder='perl ~/scripts/case_management.pl -t find -c'
+# alias ir='perl /Users/xsong/scripts/case_management.pl -t ir -l'
+# alias ircn='perl /Users/xsong/scripts/case_management.pl -t ir -l cn'
+# alias eogs='perl /Users/xsong/scripts/case_management.pl -t eogs'
+
 alias logs='perl /Users/xsong/scripts/case_management.pl -t log -c'
-alias clipboard='killall pboard'
+# alias clipboard='killall pboard'
 alias report='perl /Users/xsong/scripts/case_management.pl -t case_report'
 alias pivnet='export http_proxy="socks5://localhost:1086"; export https_proxy="socks5://localhost:1086"; pivnet'
-alias psql='/Library/PostgreSQL/9.6/bin/psql -p 5432 -h aio1 -U gpadmin'
-alias gcp="ssh '-o ServerAliveInterval=5'  gpadmin@gcp-gp7"
+# alias psql='/Library/PostgreSQL/9.6/bin/psql -p 5432 -h aio1 -U gpadmin'
+# alias gcp="ssh '-o ServerAliveInterval=5'  gpadmin@gcp-gp7"
 alias logserver="ssh paassupport@tanzu-csp-1.tanzu-gss-labs.vmware.com"
-alias pg="ssh postgres@paf-m"
+# alias pg="ssh postgres@paf-m"
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
@@ -40,3 +41,11 @@ PERL_MM_OPT="INSTALL_BASE=/Users/xsong/perl5"; export PERL_MM_OPT;
 
 export PATH=$PATH:~/scripts;
 
+### gcp ###
+alias vmlist='gcloud compute instances list | grep "^matt-"'
+alias aio='gcloud compute ssh gpadmin@matt-gpdb-aio --zone=asia-east2-a'
+alias pg='gcloud compute ssh postgres@matt-pgautofailover-monitor --zone=asia-east2-a'
+alias gssh='gcloud compute ssh --zone=asia-east2-a'
+alias vmstart='gcloud compute instances start --zone=asia-east2-a'
+alias vmstop='gcloud compute instances stop --zone=asia-east2-a'
+alias gscp='gcloud compute scp --zone=asia-east2-a'
