@@ -12,7 +12,6 @@ dataNodePGDATA='/data/database'
 dataNodePort=5432
 backupStanza='main'
 db='postgres'
-subnet='10.216.0.0/16'    ## the subnet for all cluster, TBD: will update here to automatic detect it later
 workFolder=$(mktemp -d)
 
 ## color variables
@@ -171,6 +170,9 @@ enable_Archive_On_DataNode()
         fi 
     done
 
+    # we set the subnet to /16 for now
+    subnet=`ping $monitor_host -c 1 | grep PING | awk '{print $3}' | sed 's/(//g' | sed 's/)//g' | awk -F'.' '{print $1"."$2".0.0/16"}'`
+    
     for host in `echo $data_nodes | sed 's/,/ /g'`
     do 
         pgHome=`ssh $host "ps -ef | grep postgres | grep vmware | grep D | grep -v bash | awk '{print \\\$8}' | sed 's/postgres$//g' "`
