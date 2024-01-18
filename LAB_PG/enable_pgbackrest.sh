@@ -15,31 +15,11 @@ db='postgres'
 workFolder=$(mktemp -d)
 
 ## color variables
-green="\e[1;32m"
-red="\e[1;31m"
-yellow="\e[1;33m"
-normal="\e[0m"
-
-ECHO_SYSTEM()
-{
-    message=$1
-    echo -e "${green}${message}${normal}"
-}
-ECHO_WARN()
-{
-    message=$1
-    echo -e "${yellow}${message}${normal}"
-}
-ECHO_ERROR()
-{
-    message=$1
-    echo -e "${red}${message}${normal}"
-}
-ECHO_DEBUG()
-{
-    message=$1
-    [ "x$DEBUG" == 'x1' ] && echo -e "[DEBUG] $message"
-}
+green="\e[1;32m"; red="\e[1;31m" ; yellow="\e[1;33m"; normal="\e[0m"; cyan="\e[0;36m"
+ECHO_SYSTEM(){ message=$1; echo -e "${green}${message}${normal}"; }
+ECHO_WARN(){ message=$1; echo -e "${yellow}${message}${normal}"; }
+ECHO_ERROR(){ message=$1; echo -e "${red}${message}${normal}"; }
+ECHO_DEBUG(){ message=$1; [ "x$DEBUG" == 'x1' ] && echo -e "[DEBUG] ${cyan}${message}${normal}"; }
 
 print_help()
 {
@@ -56,8 +36,8 @@ do
     in
         m) monitor_host=${OPTARG}   ;;
         d) data_nodes=${OPTARG}     ;;
-        D) DEBUG=1              ;;
-        h) print_help           ;;
+        D) DEBUG=1                  ;;
+        h) print_help               ;;
         *) echo "Wrong input, please check the usage with [$0 -h]" ;;
     esac
 done
@@ -69,7 +49,34 @@ fi
 ### Functions ###
 print_warning()
 {
-    ECHO_WARN "monitor: $monitor_host, Data Nodes: $data_nodes"
+    clear
+    ECHO_WARN "
+We are going to enable pgbackrest on current cluster, here is the summary:
+
+    - monitor: $monitor_host
+    - Data Nodes: $data_nodes
+    - backupFolder: $backupFolder
+    - backupStanza: $backupStanza
+
+Continue the script will going to remove all the data of existing backup in [$backupFolder]
+
+Is that ok? <y/n>"
+while :; 
+do 
+    read response
+    response_lower=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+
+    if [[ "x$response_lower" == "xyes" || "x$response_lower" == "xy" ]]; then
+        ECHO_SYSTEM "Continuing..."
+        break
+    elif [[ "x$response_lower" == "no" || "x$response_lower" == "xn" ]]; then
+        ECHO_ERROR "cancelled by user, exiting..."
+        exit 1
+    else
+        ECHO_ERROR "Invalid response. Please enter 'yes' or 'no'."
+        continue
+    fi
+done
 }
 
 run_remote_command()
@@ -96,6 +103,9 @@ prepare()
     done 
 
     ### Setup monitor folder
+    ECHO_SYSTEM "Cleanup old backup directory under [$backupFolder]..."
+    run_remote_command $monitor_host "[ -d $backupFolder ] && rm -rf $backupFolder || echo -n '' "
+
     ECHO_SYSTEM "Creating backup folder under [$backupFolder] on host [$monitor_host]..."
     run_remote_command $monitor_host "sudo mkdir -p $backupFolder; sudo chmod 750 $backupFolder; sudo chown -R $pgUser:$pgUser $backupFolder"
     ECHO_SYSTEM "Creating log folder under [$pgbackrestLogFolder] on host [$monitor_host]..."
@@ -243,6 +253,7 @@ cleanup()
 
 
 ### Start the work ###
+print_warning                   ## let user confirm if he/she would like to continue
 prepare                         ## 01: precheck and create the related folder if not there
 update_pgbackrest_conf          ## 02: generate conf file for pgbackrest
 createStanza                    ## 03: create the Stanza
