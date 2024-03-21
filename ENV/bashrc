@@ -48,4 +48,4 @@ alias pg='gcloud compute ssh postgres@matt-pgautofailover-monitor --zone=asia-ea
 alias gssh='gcloud compute ssh --zone=asia-east2-a'
 alias vmstart='gcloud compute instances start --zone=asia-east2-a'
 alias vmstop='gcloud compute instances stop --zone=asia-east2-a'
-alias gscp='gcloud compute scp --zone=asia-east2-a'
+alias gscp='gcloud compute scp --zone=asia-east2-a '

@@ -10,6 +10,7 @@ SegmentList="/home/gpadmin/all_segment_hosts.txt"
 GP_HOME="/opt"
 GP_DATA_MASTER="/data/master"
 GP_DATA_SEGMENT="/data/segment"
+GP_ORI_HOME='/usr/local'
 
 ## color variables
 green="\e[1;32m"
@@ -101,14 +102,17 @@ Please confirm if you would like to continue: [y/n]"
 
         for server in `cat $SegmentList | grep -v "^#"`
         do
-            if [ "x`echo $gp_ver | sed 's/\..*//g'`" == 'x6' ]
+            if [ "x`echo $gp_ver | sed 's/\..*//g'`" == 'x6' ] || [ "x`echo $gp_ver | sed 's/\..*//g'`" == 'x7' ]
             then
                 sudo ssh $server "[ `rpm -qa | grep greenplum-db | grep ${gp_ver} | wc -l` -gt 0 ] && rpm -e `rpm -qa | grep greenplum-db | grep ${gp_ver}` || : "
-                ssh $server "[ -h ${gp_home} ] && rm -f $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
-            else
+                ## remove the folder on /opt, it is a link
+		ssh $server "[ -h ${gp_home} ] && rm -f $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
+		## remove the folder on /usr/local
+                ssh $server "[ -d ${GP_ORI_HOME}/greenplum-db-${gp_ver} ] && sudo rm -rf ${GP_ORI_HOME}/greenplum-db-${gp_ver} && echo \"Removed [${GP_ORI_HOME}/greenplum-db-${gp_ver}] on segment host [$server]\""
+            else ## not rpm install, just remove the data folder
                 ssh $server "[ -d ${segment_data_folder} ] && rm -rf $segment_data_folder && echo \"Removed [$segment_data_folder] on segment host [$server]\""
+                ssh $server "[ -d ${gp_home} ] && rm -rf $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
             fi            
-            ssh $server "[ -d ${gp_home} ] && rm -rf $gp_home && echo \"Removed [$gp_home] on segment host [$server]\""
             #echo "Removed $segment_data_folder on segment host [$server]"
         done
     else

@@ -19,6 +19,8 @@ use strict;
 use Data::Dumper;
 use Term::ANSIColor;
 use Getopt::Std;
+use Sys::Hostname;
+my $hostname = hostname
 my %opts; getopts('hf:Dy', \%opts);
 
 my $DEBUG = $opts{'D'};   
@@ -30,8 +32,8 @@ my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
 my $gpdb_segment_home = "/data/segment"; 
 my $gpdb_segment_num = 2;
-my $master_hostname = 'mdw';                      ## master host
-my @segment_list = ('sdw1');               ## segment hosts list
+my $master_hostname = $hostname;                      ## master host
+my @segment_list = ($hostname);                       ## segment hosts list
 my $gp_user = 'gpadmin';
 
 &print_help if $opts{'h'};
@@ -171,7 +173,7 @@ sub install_gpdb_package
         my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-*/ | grep $gp_ver));
         my $default_folder = $find_default_folder->{'output'};
         run_command(qq(sudo chown -R gpadmin:gpadmin $default_folder),1);
-        run_command(qq(sudo ln -s $default_folder $gp_home ));
+        run_command(qq([ -h $gp_home ] && rm -f $gp_home;  sudo ln -s $default_folder $gp_home ));
         ECHO_INFO("successfully installed [$package]!");
     }
     elsif ( $package =~ /\.bin$/)
@@ -331,9 +333,8 @@ $conf_mirror
     print INIT "$gpinitsystem_config";
 
     ECHO_INFO("Start to initialize the GPDB with config file [$gp_home/gpinitsystem_config] and host file [${gp_home}/seg_hosts]");
-    ### updated at 2024-01-17: clean up LD_LIBRARY_PATH in order to handle error `undefined symbol: ZSTD_compressStream2` 
     my $result = run_command(qq (
-        source ${gp_home}/greenplum_path.sh; export LD_LIBRARY_PATH=; 
+        source ${gp_home}/greenplum_path.sh; export LD_LIBRARY_PATH=;
         gpinitsystem -c ${gp_home}/gpinitsystem_config -h ${gp_home}/seg_hosts -a | egrep "WARN|ERROR|FATAL"
     ));
     
@@ -373,7 +374,7 @@ sub set_env
     ## remove the greenplum-db file and relink to target folder
     ECHO_INFO("Relink the greenplum-db to [$gp_home]...");
     run_command(qq(rm -f $gpdp_home_folder/greenplum-db)) if ( -e "$gpdp_home_folder/greenplum-db");
-    run_command(qq(ln -s $gp_home $gpdp_home_folder/greenplum-db));
+    # run_command(qq(ln -s $gp_home $gpdp_home_folder/greenplum-db));
 
     ECHO_SYSTEM("
 ###############################################################

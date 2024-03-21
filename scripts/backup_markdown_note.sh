@@ -5,7 +5,7 @@ home_folder='/Users/xsong/Documents/Work'
 archive_folder="${home_folder}/999_Archive"
 target_folder_list='01_Cases 02_Jira'
 # target_folder_list='01_Cases 02_Jira 03_Others'
-backup_target='/Users/xsong/ssd/backup/typora_backup'
+backup_target='/Users/xsong/Downloads/box/backup/typora_backup'
 
 ### create target backup folder ###
 mkdir -pv "${archive_folder}/${today}"
