@@ -10,6 +10,7 @@ fi
 ### the list you would like to add:
 domain_list="
 *.vmware.com
+*.jd.com
 "
 
 cur_list=`networksetup -getproxybypassdomains "WI-FI"`
@@ -19,10 +20,11 @@ for url in `echo $domain_list`;
 do
     echo "checking if [$url] has already in the list..."
     count=`echo $cur_list | grep -w $url | wc -l | sed 's/ //g'`
-    echo "DEBUG: count is [$count]"
+#    echo "DEBUG: count is [$count]"
     if [ "x$count" != 'x0' ]; then
         echo "found [$url] in the list, skip..."
     else
+        echo "Adding [$url]..."
         need_add=`echo -e "${need_add}\n${url}"`
     fi
 done
@@ -30,8 +32,8 @@ done
 final_list=`echo "$cur_list $need_add" | sed 's/\n/ /g'`
 # echo $final_list
 
-echo "updating the system proxybypassdomains.."
+echo -e "\nUpdating the system proxybypassdomains.."
 ## networksetup -setproxybypassdomains <networkservice> <domain1> [domain2] [...]
 networksetup -setproxybypassdomains "$target_device" $final_list
-echo "Done, the proxybypassdomains now is like below:"
+echo -e "Done, the proxybypassdomains now is like below:\n"
 networksetup -getproxybypassdomains $target_device
