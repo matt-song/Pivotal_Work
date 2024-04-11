@@ -12,6 +12,7 @@ domain_list="
 *.vmware.com
 *.jd.com
 *.bilibili.com
+*.wolkenservicedesk.com
 "
 
 cur_list=`networksetup -getproxybypassdomains "WI-FI"`
