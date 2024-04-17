@@ -9,11 +9,14 @@ fi
 
 ### the list you would like to add:
 domain_list="
-*.vmware.com
 *.jd.com
 *.bilibili.com
 *.wolkenservicedesk.com
+*.jira.eng.vmware.com
+*.eng.vmware.com
 "
+# *.confluence.eng.vmware.com
+# *.vmware.com
 
 cur_list=`networksetup -getproxybypassdomains "WI-FI"`
 need_add=''

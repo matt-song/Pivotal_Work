@@ -5,7 +5,6 @@ logs()
     message=$1
     date=`date +"%F %R"`
     echo "${date} ${message}"
-
 }
 
 ### start work ###
@@ -13,15 +12,13 @@ logs()
 # SS server INFO
 ss_password='xxxxxxxxxx'
 ss_bin='/opt/shadowsocks-rust/bin/ssserver'
-ss_port_v2ray='80'
+ss_port_v2ray_list='80 216' ## port list to start with v2ray-plug, example: 80 8080 8001
 ss_port_normal='8001'
 ss_encryption='aes-128-gcm'
 ss_plugin='/opt/shadowsocks-rust/plugin/v2ray-plugin'
 ss_pluginOpt='server'
 # ss_listenAddr=`/usr/sbin/ip a | grep eth0 | grep inet | awk '{print $2}' | sed 's/\/.*//g'`
 ss_listenAddr='0.0.0.0'
-ss_pidFile_v2ray="shadowsocks_${ss_port_v2ray}.pid"
-ss_pidFile_normal="shadowsocks_${ss_port_normal}.pid"
 
 # Check if the script has already started
 script_name=`basename $0`
@@ -35,18 +32,19 @@ then
     exit 1
 fi
 
-### define the list to check ###
-SS_v2ray_count=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_v2ray}" | wc -l`
-SS_normal_count=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_normal}" | wc -l`
-
 ### check port of v2ray ###
-logs "Checking port $ss_port_v2ray SS status.."
-logs "The process count for port $ss_port_v2ray is [ $SS_v2ray_count ]"
+for ss_port_v2ray in $ss_port_v2ray_list; 
+do 
+    ss_pidFile_v2ray="shadowsocks_${ss_port_v2ray}.pid"
+    SS_v2ray_count=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_v2ray}" | wc -l`
+    
+    logs "Checking port $ss_port_v2ray SS status.."
+    logs "The process count for port $ss_port_v2ray is [ $SS_v2ray_count ]"
 
-if [ "x$SS_v2ray_count" != 'x1' ]
-then
-    logs "SS on port $ss_port_v2ray has down, restart it!"
-    # $ss_bin -s $ss_listenAddr -p $ss_port_v2ray -k $ss_password -m $ss_encryption --plugin $ss_plugin --plugin-opts $ss_pluginOpt -f /tmp/.${ss_pidFile_v2ray}
+    if [ "x$SS_v2ray_count" != 'x1' ]
+    then
+        logs "SS on port $ss_port_v2ray has down, restart it!"
+        # $ss_bin -s $ss_listenAddr -p $ss_port_v2ray -k $ss_password -m $ss_encryption --plugin $ss_plugin --plugin-opts $ss_pluginOpt -f /tmp/.${ss_pidFile_v2ray}
 
 sudo $ss_bin -s "${ss_listenAddr}:${ss_port_v2ray}" \
 -m $ss_encryption \
@@ -55,18 +53,22 @@ sudo $ss_bin -s "${ss_listenAddr}:${ss_port_v2ray}" \
 --plugin-opts $ss_pluginOpt \
 --daemonize-pid /tmp/.${ss_pidFile_v2ray}
 
-    SS_v2ray_count_new=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_v2ray}" | wc -l`
-    if [ "x$SS_v2ray_count_new" != 'x1' ]
-    then
-        logs "Failed to start the SS on prot $ss_port_v2ray, please check"
+        SS_v2ray_count_new=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_v2ray}" | wc -l`
+        if [ "x$SS_v2ray_count_new" != 'x1' ]
+        then
+            logs "Failed to start the SS on prot $ss_port_v2ray, please check"
+        else
+            logs "SS on port $ss_port_v2ray has started successfully"
+        fi
     else
-        logs "SS on port $ss_port_v2ray has started successfully"
+        logs "SS on port $ss_port_v2ray is running fine"
     fi
-else
-    logs "SS on port $ss_port_v2ray is running fine"
-fi
+done
 
 ### check port of no-plugin ###
+ss_pidFile_normal="shadowsocks_${ss_port_normal}.pid"
+SS_normal_count=`ps -ef | grep ssserver | grep -v grep | grep daemonize | grep "${ss_pidFile_normal}" | wc -l`
+
 logs "Checking port $ss_port_normal SS status.."
 logs "The process count for port $ss_port_normal is [ $SS_normal_count ]"
 
