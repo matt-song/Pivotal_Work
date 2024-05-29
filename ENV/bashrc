@@ -31,6 +31,8 @@ alias pivnet='export http_proxy="socks5://localhost:1086"; export https_proxy="s
 # alias psql='/Library/PostgreSQL/9.6/bin/psql -p 5432 -h aio1 -U gpadmin'
 # alias gcp="ssh '-o ServerAliveInterval=5'  gpadmin@gcp-gp7"
 alias logserver="ssh paassupport@tanzu-csp-1.tanzu-gss-labs.vmware.com"
+alias new_logserver="ssh xs031601@broadcom.net@vcf-csp.acc.broadcom.net"
+# alias new_logserver="ssh vcf-csp-stage.acc.broadcom.net"
 # alias pg="ssh postgres@paf-m"
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;

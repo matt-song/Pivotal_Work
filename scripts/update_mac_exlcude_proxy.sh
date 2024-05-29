@@ -14,6 +14,9 @@ domain_list="
 *.wolkenservicedesk.com
 *.jira.eng.vmware.com
 *.eng.vmware.com
+*.oc.vmware.com
+*.broadcom.net
+*.wolkenservicedesk.com
 "
 # *.confluence.eng.vmware.com
 # *.vmware.com

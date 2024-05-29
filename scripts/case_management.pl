@@ -108,9 +108,11 @@ Good day to you. Cloud you please help provide below info/files so we can check 
 
 1. Please help collect the logs from master and problematic segment server, you may collect the logs via GPMT. Please check below KB for more reference:
 https://community.pivotal.io/s/article/Greenplum-Magic-Tool-GPMT?language=en_US
+https://docs.vmware.com/en/VMware-Greenplum/6/greenplum-database/utility_guide-ref-gpmt-gp_log_collector.html
 
 2. Please check if we have any core file has been generated during the time segment crash. Please check below KB for more reference:
 https://community.pivotal.io/s/article/How-to-Collect-Core-Files-for-Analysis
+https://docs.vmware.com/en/VMware-Greenplum/6/greenplum-database/utility_guide-ref-gpmt-packcore.html
 
 3. Please collect the minirepro of the query
 https://community.pivotal.io/s/article/How-to-Collect-DDL-and-Statistics-Information-Using-the-Minirepro-Utility
