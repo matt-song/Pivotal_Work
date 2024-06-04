@@ -107,7 +107,7 @@ sub generate_ask_log_template
 Good day to you. Cloud you please help provide below info/files so we can check further?
 
 1. Please help collect the logs from master and problematic segment server, you may collect the logs via GPMT. Please check below KB for more reference:
-https://community.pivotal.io/s/article/Greenplum-Magic-Tool-GPMT?language=en_US
+https://knowledge.broadcom.com/external/article?articleNumber=297023
 https://docs.vmware.com/en/VMware-Greenplum/6/greenplum-database/utility_guide-ref-gpmt-gp_log_collector.html
 
 2. Please check if we have any core file has been generated during the time segment crash. Please check below KB for more reference:

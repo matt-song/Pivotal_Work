@@ -7,11 +7,11 @@ then
     exit 1
 fi
 
-echo "updating local repository"
+# echo "updating local repository"
 
-cd /Users/xsong/Documents/GPDB_Code/gp-gpdb6/gpdb-6X_STABLE
-git checkout
-git pull
+# cd /Users/xsong/Documents/GPDB_Code/gp-gpdb6/gpdb-6X_STABLE
+# git checkout
+# git pull
 
 echo "checking tag [$tag].."
 git tag --contain $tag 
