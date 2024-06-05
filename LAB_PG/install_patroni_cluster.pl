@@ -22,7 +22,8 @@ Workflow:
 
 Others:
 - will set below ENV:
-    1. PATRONI_CONFIGURATION
+    1. PATRONI_ETCD_HOSTS
+    2. PATRONI_SCOPE
     2. PGDATA
     3. PATH
 
@@ -49,11 +50,13 @@ my $DEBUG = $opts{'D'};
 
 #### please review and edit below settings if needed ###
 my $pgUser = 'postgres';
+my $patroniScope = 'patroni_cluster';
 my $dataNodeDataFolder = "/data/database";
 my $tempFolder = '/tmp';
 my $workDir = "/tmp/setup_patroni.$$";
 # my $PgAutoFailoverServiceConf = '/etc/systemd/system/pgautofailover.service';
 my $bashrcInclude = "/home/postgres/.bashrc_patroni";
+
 
 my $etcdVer = '3.4.32';
 my $etcdDataFolder = '/data/etcd';
@@ -78,14 +81,14 @@ InstallPostgresRpm($clusterInfo);
 InstallPatroni($clusterInfo,$etcdUrl);
 
 ## Step05: post installation, update bashrc
-doPostInstallationTask($clusterInfo);
+doPostInstallationTask($clusterInfo,$etcdUrl);
 
 
 #### Functions ####
 
 sub doPostInstallationTask
 {
-    my $clusterInfo = shift;
+    my ($clusterInfo,$etcdUrl) = @_;
     my $path = "/opt/vmware/postgres/$clusterInfo->{'majorVer'}/bin";
 
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {updateBashrc($_, $dataNodeDataFolder); };
@@ -98,17 +101,19 @@ sub doPostInstallationTask
         my $cmd_CheckBashrc = qq(cat ~/.bashrc | grep $bashrcInclude | grep -w "\." |wc -l);
         my $result = run_command(qq(ssh ${pgUser}\@$host "$cmd_CheckBashrc"),1);
 
+        my $content=qq(echo -e 'export PATRONI_ETCD_HOSTS=$etcdUrl\\nexport PATRONI_SCOPE=$patroniScope\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+
         if ($result->{'output'} >= 1)
         {
-            my $content = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            #my $content = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder/$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
             run_command(qq(ssh ${pgUser}\@$host "$content"),1); 
         }
         else
         {
             my $contentBashrc = qq(echo -e '### Patroni environment\\nif [ -f $bashrcInclude ]; then\\n    . $bashrcInclude\\nfi' >> ~/.bashrc); 
             run_command(qq(ssh ${pgUser}\@$host "$contentBashrc"),1); 
-            my $contentExtraBashrc = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
-            run_command(qq(ssh ${pgUser}\@$host "$contentExtraBashrc"),1); 
+            # my $contentExtraBashrc = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder/$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            run_command(qq(ssh ${pgUser}\@$host "$content"),1); 
         }
     }
 }
@@ -170,7 +175,7 @@ sub InstallPatroni
     {
          my $host = shift;
          my $patroniYaml = qq(
-scope: patroni_cluster
+scope: $patroniScope
 name: $host
 restapi:
   listen: '$host:8008'
