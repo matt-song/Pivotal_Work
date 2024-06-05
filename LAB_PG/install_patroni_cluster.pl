@@ -20,6 +20,12 @@ Workflow:
 2. install the ETCD on all host
 3. install patroni on allhost
 
+Others:
+- will set below ENV:
+    1. PATRONI_CONFIGURATION
+    2. PGDATA
+    3. PATH
+
 Update:
 - N/A
 #############################################################################
@@ -31,11 +37,12 @@ use Term::ANSIColor;
 use Getopt::Std;
 use File::Basename;
 
-my %opts; getopts('hf:Dym:d:l:', \%opts);
+my %opts; getopts('hf:Dym:d:l:p:', \%opts);
 my $haProxyHost = $opts{'m'};
 my $dataNodeHosts = $opts{'d'};   ## will also include etcd
 my $installationFile=$opts{'f'};
 my $installationLibFile=$opts{'l'};
+my $installationPatroniFile=$opts{'p'};
 my $ALL_YES = $opts{'y'};
 my $DEBUG = $opts{'D'};
 
@@ -64,36 +71,102 @@ my $clusterInfo = doThePreCheck();
 cleanUp($clusterInfo);
 
 ## Step03: Setup ETCD
-setupETCD($clusterInfo);
+my $etcdUrl = setupETCD($clusterInfo);
 
 ## Step04: InstallPatroni
 InstallPostgresRpm($clusterInfo);
-SetupPatroni($clusterInfo);
+InstallPatroni($clusterInfo,$etcdUrl);
+
+## Step05: post installation, update bashrc
+doPostInstallationTask($clusterInfo);
 
 
-# export PATH=$PATH:/opt/vmware/postgres/16/bin
-# /opt/vmware/postgres/16/bin/patroni patroni.yml  > logs.txt 2>&1  &
-# patronictl -c patroni.yml list
-
-
-
-
-
- 
 #### Functions ####
 
-sub SetupPatroni
+sub doPostInstallationTask
 {
     my $clusterInfo = shift;
+    my $path = "/opt/vmware/postgres/$clusterInfo->{'majorVer'}/bin";
+
+    foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {updateBashrc($_, $dataNodeDataFolder); };
+
+    ## checking if we have ~/.bashrc updated
+    sub updateBashrc
+    {
+        my ($host,$pgdata) = @_;
+        ECHO_INFO("Update bashrc file for host [$host]...");
+        my $cmd_CheckBashrc = qq(cat ~/.bashrc | grep $bashrcInclude | grep -w "\." |wc -l);
+        my $result = run_command(qq(ssh ${pgUser}\@$host "$cmd_CheckBashrc"),1);
+
+        if ($result->{'output'} >= 1)
+        {
+            my $content = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            run_command(qq(ssh ${pgUser}\@$host "$content"),1); 
+        }
+        else
+        {
+            my $contentBashrc = qq(echo -e '### Patroni environment\\nif [ -f $bashrcInclude ]; then\\n    . $bashrcInclude\\nfi' >> ~/.bashrc); 
+            run_command(qq(ssh ${pgUser}\@$host "$contentBashrc"),1); 
+            my $contentExtraBashrc = qq(echo -e 'export PATRONI_CONFIGURATION=$patroniFolder$patroniYamlFile\\nexport PGDATA=$pgdata\\nexport PATH='$path':\\\$PATH' > $bashrcInclude);
+            run_command(qq(ssh ${pgUser}\@$host "$contentExtraBashrc"),1); 
+        }
+    }
+}
+
+sub InstallPatroni
+{
+    my ($clusterInfo,$etcdHostList) = @_;
 
     foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) 
     {
         setupDependency($dataNode);
-        setupPatroniNode($dataNode);
-
+        setupPatroni($dataNode);
+        startPatroni($dataNode, $clusterInfo->{'majorVer'})
     }
+    sleep(5); ## wait for all node sync up
+    verifyPatroni((split(/,/,$clusterInfo->{'dataNodeList'}))[0], $clusterInfo->{'majorVer'});
 
-    sub setupPatroniNode
+    ## end ##
+
+    sub verifyPatroni
+    {
+        my ($host,$ver) = @_;
+        ECHO_INFO("Installation finished, verifying the cluster state...");
+        my $result = run_command(qq(ssh ${pgUser}\@${host} "/opt/vmware/postgres/$ver/bin/patronictl -c $patroniFolder/$patroniYamlFile list"));
+        ECHO_SYSTEM($result->{'output'});
+    }
+    sub startPatroni
+    {
+
+        my ($host,$ver) = @_;
+        my $cmdStartPartoni = qq(export PATH=\\\$PATH:/opt/vmware/postgres/$ver/bin; nohup patroni $patroniFolder/$patroniYamlFile > $patroniFolder/patroni.log 2>&1  &);
+        run_command(qq(ssh ${pgUser}\@${host} "$cmdStartPartoni"),1);
+        my $processCount = run_command(qq(ssh ${pgUser}\@${host}  "ps -ef | grep patroni | grep python | grep -v grep | wc -l"));
+        if ($processCount == 0) 
+        {
+            ECHO_ERROR("Failed to start Patroni on host [$host]",1);
+        }
+        my $retry = 5;
+        for my $i (1..$retry)
+        {
+            my $isReady = run_command(qq(ssh ${pgUser}\@${host}  "/opt/vmware/postgres/$ver/bin/pg_isready |grep -w 'accepting connections' | wc -l"),1);
+            if ($isReady->{'output'} = 0)
+            {
+                ECHO_SYSTEM("Postgres on [$host] has not ready yet, will wait and retry");
+                sleep(5);
+            }else{
+                ECHO_INFO("Postgres on [$host] has ready");
+                last;
+            }
+            $i++;
+            if ($i == $retry)
+            {
+                ECHO_ERROR("Reached maxium retry count, postgres not ready yet, please check the logs and retry",1);
+            }
+        }
+    }
+    
+    sub setupPatroni
     {
          my $host = shift;
          my $patroniYaml = qq(
@@ -103,7 +176,7 @@ restapi:
   listen: '$host:8008'
   connect_address: '$host:8008'
 etcd:
-  hosts: 'pat1:2379,pat2:2379,pat3:2379'
+  hosts: '$etcdHostList'
 bootstrap:
   dcs:
     ttl: 30
@@ -125,7 +198,7 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
   pg_hba:
-    - host replication replicator 10.216.2.0/24 md5
+    - host replication replicator 0.0.0.0/0 md5
     - host all all 0.0.0.0/0 md5
   users:
     admin:
@@ -154,7 +227,12 @@ tags:
   clonefrom: false
   nosync: false
          );
-
+    ECHO_INFO("Generating paroni config file for host [$host]...");
+    open YAMLFILE,'>',"$workDir/$patroniYamlFile" or die {ECHO_ERROR("Failed to write into temp patroni config file [$workDir/etcd_config.yaml]",1)};
+    print YAMLFILE $patroniYaml;
+    close YAMLFILE;
+    my $cmd_scpYamlFile = qq(scp $workDir/$patroniYamlFile ${pgUser}\@${host}:${patroniFolder}/${patroniYamlFile});
+    run_command($cmd_scpYamlFile,1);
     }
     
     sub setupDependency
@@ -188,95 +266,6 @@ ydiff>=1.2.0
         ## clean up the temp installation file 
         run_command(qq(ssh ${pgUser}\@${host} "[ -f ${tempFolder}/requirements.txt ] && rm -f ${tempFolder}/requirements.txt || echo 'file not found [${tempFolder}/requirements.txt], skip' "),1);
     }
-
-
-
-
-=note
-    3. yum install -y python3 python3-devel gcc
-
-
-yum install -y python3 python3-devel gcc
-
-cat - <<HEREDOC > requirements.txt
-PyYAML
-click>=4.1
-prettytable>=0.7
-psutil>=2.0.0
-python-dateutil
-python-etcd>=0.4.3,<0.5
-requests
-six >= 1.7
-urllib3>=1.19.1,!=1.21
-ydiff>=1.2.0
-HEREDOC
-
-
-FATAL: Patroni requires psycopg2>=2.5.4, psycopg2-binary, or psycopg>=3.0.0
-
-pip3 install --user -r requirements.txt
-
-
-cat - <<HEREDOC > patroni.yml
-scope: patroni_cluster
-name: pat1
-restapi:
-  listen: 'pat1:8008'
-  connect_address: 'pat1:8008'
-etcd:
-  hosts: 'pat1:2379,pat2:2379,pat3:2379'
-bootstrap:
-  dcs:
-    ttl: 30
-    loop_wait: 10
-    retry_timeout: 10
-    maximum_lag_on_failover: 1048576
-    postgresql:
-      use_pg_rewind: true
-      use_slots: true
-      parameters:
-        hot_standby: 'on'
-        wal_keep_segments: 20
-        max_wal_senders: 8
-        max_replication_slots: 8
-    slots:
-      patroni_standby_leader:
-        type: physical
-  initdb:
-    - encoding: UTF8
-    - data-checksums
-  pg_hba:
-    - host replication replicator 10.216.2.0/24 md5
-    - host all all 0.0.0.0/0 md5
-  users:
-    admin:
-      password: abc123
-      options:
-        - createrole
-        - createdb
-postgresql:
-  listen: 'pat1:5432'
-  connect_address: 'pat1:5432'
-  data_dir: /data/database
-  pgpass: /tmp/pgpass0
-  authentication:
-    replication:
-      username: replicator
-      password: rep-pass
-    superuser:
-      username: postgres
-      password: postgres
-    rewind:
-      username: rewind_user
-      password: rewind_password
-tags:
-  nofailover: false
-  noloadbalance: false
-  clonefrom: false
-  nosync: false
-HEREDOC
-=cut
-
 }
 
 
@@ -291,10 +280,10 @@ sub InstallPostgresRpm
     {
         if ($clusterInfo->{'majorVer'} >= 16)
         {
-            installRpm($dataNode, $clusterInfo->{'libPackage'});
+            installRpm($dataNode, $installationLibFile);
         }
-        installRpm($dataNode, $clusterInfo->{'package'});
-        ### TBD: install partoini rpm
+        installRpm($dataNode, $installationFile);
+        installRpm($dataNode, $installationPatroniFile);
     };
 
     sub installRpm
@@ -361,6 +350,17 @@ sub setupETCD
     my $cmd_etcdCluster = qq(etcdctl endpoint status --write-out=table --endpoints=http://$etcdNode:2379 --cluster);
     my $result = run_command(qq(ssh ${pgUser}\@${etcdNode} "$cmd_etcdCluster" ),1);
     ECHO_SYSTEM($result->{'output'});
+
+    ## generate etcd url: 'pat1:2379,pat2:2379,pat3:2379'
+    my $etcdUrl = '';
+    foreach my $node (split(/,/,$clusterInfo->{'dataNodeList'}))
+    {
+        $etcdUrl .= "${node}:2379,"
+    }
+    $etcdUrl =~ s/,$//;
+    # ECHO_SYSTEM($etcdUrl);
+    return $etcdUrl;
+
 
     sub installETCD
     {
@@ -448,7 +448,8 @@ sub doThePreCheck
 {
     my $clusterInfo = {};
 
-    print_help("Can not find target rpm file [#installationFile]!") unless ( -f $installationFile);
+    print_help("Can not find target rpm file [$installationFile]!") unless ( -f $installationFile);
+    print_help("Can not find target patroni rpm file [$installationPatroniFile]!") unless ( -f $installationPatroniFile);
     print_help("please HA proxy's hostname!") if (! $haProxyHost);
     print_help("please input data node's hostname!") if (! $dataNodeHosts);
     ECHO_INFO("Creating work directory [$workDir]");
@@ -457,6 +458,8 @@ sub doThePreCheck
     $clusterInfo->{'dataNodeList'} =  $dataNodeHosts;
     $clusterInfo->{'haProxyHost'} =  $haProxyHost;
     $clusterInfo->{'package'} = basename($installationFile);
+    # $clusterInfo->{'patroniPackage'} = $installationPatroniFile;
+    
 
     if ($clusterInfo->{'package'} =~ /^vmware-postgres(\d*)-(\d+\.\d+)-\d.*rpm$/)
     {
@@ -471,14 +474,17 @@ sub doThePreCheck
     ### In PG16 we must install lib first
     if ($clusterInfo->{'majorVer'} >= 16)
     {
+        ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1) unless (-f $installationLibFile);
+=remove
         if( -f $installationLibFile )
         {
-            $clusterInfo->{'libPackage'} = $installationLibFile;
+            $clusterInfo->{'libPackage'} =  $installationLibFile;
         }
         else
         {
             ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1)
         }
+=cut
     }
 
     ECHO_SYSTEM("
@@ -486,11 +492,19 @@ sub doThePreCheck
 PG_AUTO_FAILOVER Cluster Installation Summary: 
 ##############################################
 
-Target Version:    \t[$clusterInfo->{'pgVersion'}]
-HA proxy host:     \t[$haProxyHost]
-DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
-ETCD host:         \twill be installed on same hosts as data node.
-DataNode's PGDATA: \t[$dataNodeDataFolder]
+Installation source:
+
+    VmwarePostgres:    \t$installationFile
+    LibPackage:        \t$installationLibFile
+    PatroniPackage:    \t$installationPatroniFile
+
+Cluster settings:
+
+    Target Version:    \t[$clusterInfo->{'pgVersion'}]
+    HA proxy host:     \t[$haProxyHost]
+    DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
+    ETCD host:         \t[$clusterInfo->{'dataNodeList'}]
+    DataNode's PGDATA: \t[$dataNodeDataFolder]
 
 !!! WARNNING !!!
 Once you choose to continue, We will delete all the content in above folder.
@@ -530,7 +544,7 @@ sub cleanUp
         if ($processCount->{'output'} > 0)
         {
             run_command(qq(ssh ${pgUser}\@${host}  "ps -ef | grep patroni | grep python | grep -v grep | awk '{print \\\$2}' | xargs kill"),1);
-            sleep(3);
+            sleep(2);
             my $newProcessCount = run_command(qq(ssh ${pgUser}\@${host}  "ps -ef | grep patroni | grep python | grep -v grep | wc -l"),1);
             if ($newProcessCount->{'output'} > 0)
             {
@@ -557,20 +571,6 @@ sub cleanUp
             my $newPackageCount =  run_command(qq(ssh ${pgUser}\@${host} "$checkCountCMD"),1);
             ECHO_ERROR("Failed to clean up old vmware postgres package!",1) if ($newPackageCount->{'output'} > 0);
         }
-        
-        ##### note: adding echo here to eliminate unnecessary error, sort the output to let other package (like vmware-postgres13-devel-13.8-1.el7.x86_64) been removed first
-=remove        
-        my $cmd_rpmQuery = qq(rpm -qa | grep vmware-postgres | sort || echo "");   
-        my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
-
-        foreach (split(/^/,$return->{'output'})) 
-        {
-            chomp(my $rpm = $_);
-            my $cmd_rpmRemove = "sudo rpm -e $rpm";
-            ECHO_INFO("Removing rpm [$rpm] on host [$host]...");
-            run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmRemove"),1);
-        }
-=cut
     }    
     sub deleteOldPgDataFolder
     {
@@ -580,10 +580,6 @@ sub cleanUp
         run_command(qq(ssh ${pgUser}\@${host} "$cmd_DeletePGData"),1 );
     }
 }
-
-
-
-
 
 sub print_help
 {
