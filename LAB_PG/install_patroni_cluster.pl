@@ -56,6 +56,7 @@ my $tempFolder = '/tmp';
 my $workDir = "/tmp/setup_patroni.$$";
 # my $PgAutoFailoverServiceConf = '/etc/systemd/system/pgautofailover.service';
 my $bashrcInclude = "/home/postgres/.bashrc_patroni";
+my $subNet = '10.216.2.0/24';
 
 
 my $etcdVer = '3.4.32';
@@ -196,6 +197,9 @@ bootstrap:
         wal_keep_segments: 20
         max_wal_senders: 8
         max_replication_slots: 8
+        log_destination: csvlog
+        log_directory: log
+        log_statement: all
     slots:
       patroni_standby_leader:
         type: physical
@@ -203,8 +207,8 @@ bootstrap:
     - encoding: UTF8
     - data-checksums
   pg_hba:
-    - host replication replicator 0.0.0.0/0 md5
-    - host all all 0.0.0.0/0 md5
+    - host replication replicator $subNet md5
+    - host all all $subNet trust
   users:
     admin:
       password: abc123
@@ -261,6 +265,7 @@ requests
 six >= 1.7
 urllib3>=1.19.1,!=1.21
 ydiff>=1.2.0
+cdiff
         );
         print requirements $requirementsFile;
         close requirements;
