@@ -200,6 +200,7 @@ bootstrap:
         log_destination: csvlog
         log_directory: log
         log_statement: all
+        logging_collector: on
     slots:
       patroni_standby_leader:
         type: physical

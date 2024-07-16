@@ -116,6 +116,7 @@ https://docs.vmware.com/en/VMware-Greenplum/6/greenplum-database/utility_guide-r
 
 3. Please collect the minirepro of the query
 https://community.pivotal.io/s/article/How-to-Collect-DDL-and-Statistics-Information-Using-the-Minirepro-Utility
+https://knowledge.broadcom.com/external/article?articleNumber=295682
 
 4. To analyze a hung session:
 https://community.pivotal.io/s/article/Analyze-Session-Tool-Automates-Debug-Tracing-for-Hung-Greenplum-Sessions?language=en_US
