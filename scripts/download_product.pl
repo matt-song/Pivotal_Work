@@ -38,25 +38,115 @@ my $DEBUG = $opts{'D'};
 
 my $workDir = "/tmp/download_product.$$"; 
 my $localTokenFolder = "$ENV{'HOME'}/.token";
+my $downloadFolder = '/data/packages';
 run_command("mkdir -p $workDir");  ## create work dir
 
 
 ### Start the work
 
 # step1: login
-loginTanzuNet();
+my $loginInfo = loginTanzuNet();
 
 # Step1: get the product
 my $targetProductSlug = getAllDatabaseProduct();
 
 # Step2: get the release verion
-getReleases($targetProductSlug);
+my $targetReleaseInfo = getReleases($targetProductSlug);
 
+## Step3: get file list from above product_files `https://network.tanzu.vmware.com/api/v2/products/<slug>/releases/<releaseID>/product_files` 
+# print Dumper $loginInfo;
+getFileListFromRelease($targetProductSlug, $targetReleaseInfo->{'releaseID'}, $targetReleaseInfo->{'eula'}, $loginInfo->{'content'});
+
+sub getFileListFromRelease
+{
+    my ($slug,$releaseID,$eulaUrl,$accessToken) = @_;
+    ECHO_DEBUG("API parameter info: [$slug|$releaseID|$eulaUrl|$accessToken]");
+    my $url = "https://network.tanzu.vmware.com/api/v2/products/$slug/releases/$releaseID/product_files";
+    my $curlResult = getContentFromURL($url);
+    if ($curlResult->{'code'} == '200')
+    {
+        my $outputJson = $curlResult->{'content'};
+        my $allFiles = decode_json($outputJson)->{'product_files'};
+        # print Dumper $allFiles;
+        ECHO_INFO("Listing all files aviliable for download...");
+        my $id = 0; my $targetFile;
+        ### generate the list
+        for my $file (sort @$allFiles)
+        {
+            $id++;
+            $targetFile->{$id}->{'name'} = $file->{'name'};
+            $targetFile->{$id}->{'url'} = $file->{'_links'}->{'download'};
+            $targetFile->{$id}->{'fileName'}  = basename($file->{'aws_object_key'});
+            ECHO_SYSTEM(qq([$id]     $file->{'name'}));
+        }
+        while (1)
+        {
+            my $input=readAndReturn("Please choose the file you would like to download: [1 ~ $id]");
+            if (($input<1)||($input>$id))
+            {
+                ECHO_ERROR("Wrong input, please input a correct number",1);
+            }
+            else
+            {   
+                # print Dumper $targetFile;
+                downloadFile($targetFile->{$input}, $eulaUrl, $accessToken);
+                return 0;
+            }
+        }  
+    }
+    else
+    {
+        ECHO_ERROR("Unable to access API link [$url], please check and try again!");
+    }
+
+    sub downloadFile
+    {
+        my ($fileInfo, $eulaUrl, $tokenString) = @_;
+        ### accept the eula:curl -X POST -H "Authorization: Bearer <token>" <eula_url>
+        my $decoded_json = decode_json($tokenString);
+        my $accessToken = $decoded_json->{access_token};
+        $accessToken = "Authorization: Bearer $accessToken";
+        my $curlResult = getContentFromURL($eulaUrl,'',1,$accessToken);
+        if ($curlResult->{'code'} == '200')
+        {
+            ECHO_INFO("Accepted EULA from link: [$eulaUrl]");
+            ECHO_INFO("Trying to download the file now...");
+            # print "=== $fileInfo->{'url'}->{'href'} ===";
+            my $downloadUrl = $fileInfo->{'url'}->{'href'};
+            my $fileName = $fileInfo->{'fileName'};
+
+            my $path = readAndReturn("Where do you want store the file? default location is [$downloadFolder]");
+            unless ($path)
+            {
+                $path = $downloadFolder;
+            }
+            run_command(qq(mkdir -p $path) );
+            my $downloadCurlCMD = qq( curl -o $path/$fileName -L -H  "$accessToken" $downloadUrl);
+            # my $downloadResult = run_command($downloadCurlCMD);
+            system(qq($downloadCurlCMD 2>&1) );
+            # if ($downloadResult->{'code'} == 0)
+            if ($? == 0)
+            {
+                ECHO_INFO("File has been downloaded into [$path/$fileName]");
+                return 0;
+            }
+        }
+        else
+        {
+            ECHO_ERROR("Unable to accept the eula from link [$eulaUrl], the token is [$accessToken], please check again try again!");
+        }    
+
+
+
+    }
+
+}
 
 
 sub getReleases
 {
     my $productSlug = shift;
+    my $targetReleaseID;
     #API: https://network.tanzu.vmware.com/api/v2/products/{product_slug}/releases
     my $url = "https://network.tanzu.vmware.com/api/v2/products/$productSlug/releases";
     my $curlResult = getContentFromURL($url);
@@ -66,24 +156,34 @@ sub getReleases
         my $allReleases = decode_json($outputJson)->{'releases'};
         # print Dumper $allReleases;
         my $input = readAndReturn("Please input which version you would like to download, input [a] to list all the releases");
+        
+        ### list all product
         if ($input eq 'a')
         {
-            listAllRleaseAndChoose($allReleases);
+            $targetReleaseID = listAllRleaseAndChoose($allReleases);
+            return $targetReleaseID;
         }
+        
         ### loop all the releases
+        my $found = 0;
         for my $release ( @$allReleases)
         {
             if ($release->{'version'} eq '$input' )
             {
                 ECHO_INFO("Found [$input]!");
+                $found = 1;
             } 
-            else
-            {
-                ECHO_ERROR("Can not find such relase [$input], listing all the aviliable version, please choose the correct one",1); 
-                listAllRleaseAndChoose($allReleases);
-
-            }
         }
+        unless ($found)
+        {
+            ECHO_ERROR("Can not find such relase [$input], listing all the aviliable version, please choose the correct one",1); 
+            $targetReleaseID = listAllRleaseAndChoose($allReleases);
+            return $targetReleaseID;
+        }
+    }
+    else
+    {
+        ECHO_ERROR("Unable to access API link [$url], please check and try again!");
     }
 
     sub listAllRleaseAndChoose
@@ -91,21 +191,25 @@ sub getReleases
         my $releaseHash = shift;
         my $result;
         my $id = 0;
-        for my $release (sort @$allReleases)
+        # print Dumper $releaseHash;
+        for my $release (sort @$releaseHash)
         {
             $id++;
-            $result->{$id} = $releaseHash->{'version'};
-            ECHO_SYSTEM(qq([$id]     $releaseHash->{'version'} ) );
+            $result->{$id}->{'version'} = $release->{'version'};
+            $result->{$id}->{'releaseID'} = $release->{'id'};
+            $result->{$id}->{'eula'} = $release->{'_links'}->{'eula_acceptance'}->{'href'};
+            ECHO_SYSTEM(qq([$id]     $release->{'version'} ) );
         }
         while (1)
         {
             my $input = readAndReturn("Please choose which release you would like to download? []");
             if (($input<1)||($input>$id))
             {
-                ECHO_ERROR("Wrong input, please input a correct number")
+                ECHO_ERROR("Wrong input, please input a correct number",1);
             }
             else
-            {
+            {   
+                # print Dumper $result->{$id};
                 return $result->{$id};
             }
         }
@@ -131,17 +235,24 @@ sub loginTanzuNet
         open TOKEN,$localTokenFile or die { ECHO_ERROR("Can not read token file [$localTokenFile], please check and retry")};
         chomp(my $refreshToken = <TOKEN>);
         close TOKEN; ECHO_DEBUG("Token is [$refreshToken]");
-        my $code = tryLogin($refreshToken);
+        my $loginAttempt = tryLogin($refreshToken);
 
-        if ($code != '200')
+        if ($loginAttempt->{'code'} != '200')
         {
-            ECHO_ERROR("the token in the cache is not correct, please retry!");
-            tryLoginUntilSuccess()
+            ECHO_ERROR("the token in the cache is not correct, please retry!",1);
+            my $loginResult = tryLoginUntilSuccess();
+            return $loginResult;
+        }
+        else
+        {
+            #print Dumper $loginAttempt;
+            return $loginAttempt;
         }
     }
     else   ## try ask for token
     {
-        tryLoginUntilSuccess();
+        my $loginResult = tryLoginUntilSuccess();
+        return $loginResult;
     }
 
     sub tryLogin
@@ -153,11 +264,11 @@ sub loginTanzuNet
 
         if ($resultHASH->{'code'} == '200')
         {
-            run_command("[ -d $localTokenFolder ] || mkdir -v $localTokenFolder");
+            run_command("[ -d $localTokenFolder ] || mkdir -v $localTokenFolder",1);
             open CACHE,'>',$localTokenFile; #or die {ECHO_ERROR("Can not update cache file [$localTokenFile], please check and try again!")};
             print CACHE $token; close CACHE;
         }
-        return $resultHASH->{'code'};
+        return $resultHASH;
     }
     sub AskForTokenAndLogin
     {
@@ -169,11 +280,11 @@ sub loginTanzuNet
     {
         while (1)
         {
-            my $httpCode = AskForTokenAndLogin();
-            if ($httpCode == '200')
+            my $result = AskForTokenAndLogin();
+            if ($result->{'code'} == '200')
             {
                 ECHO_INFO("Login successful!");
-                last;
+                return $result;
             }
             else 
             {
@@ -204,7 +315,7 @@ sub getAllDatabaseProduct
     }
     
     my $allProducts= decode_json($outputJson)->{'products'};
-    #print Dumper $products;
+    # print Dumper $allProducts;
 
     my $productListForDB;
     my $id = 0;
@@ -217,7 +328,6 @@ sub getAllDatabaseProduct
             # my $slug = $product->{'slug'}; 
             $productListForDB->{$id}->{'slug'} = $product->{'slug'}; 
             $productListForDB->{$id}->{'product'} = $productName;
-            
             # ECHO_INFO("Find product $productName ");
             # ECHO_INFO("  slug = $product->{'slug'} ");
         }
@@ -237,7 +347,7 @@ sub getAllDatabaseProduct
     }
     while (1)
     {
-        my $choice = readAndReturn("please choose which one you would like to download: [1~$id]");
+        my $choice = readAndReturn("\nplease choose which one you would like to download: [1~$id]");
         if (($choice < 1)||($choice > $id))
         {
             ECHO_ERROR("wrong input, please input a correct id of the product",1);
@@ -256,7 +366,7 @@ sub getAllDatabaseProduct
 ### example curl -o /tmp/aaa -s -w "%{http_code}\n" https://network.tanzu.vmware.com/api/v2/products
 sub getContentFromURL
 {
-    my ($url, $header, $isPOST) = @_;
+    my ($url, $data, $isPOST, $header) = @_;
 
     my $result='';
     ### visit the URL
@@ -264,23 +374,30 @@ sub getContentFromURL
     run_command(qq( [ -f $outputFile ] && rm -f $outputFile || echo ) ); 
     my $curlCommand = qq(curl -o $workDir/curl_output.txt -s -w "%{http_code}" $url);
     
-    if ($header)
+    if ($data)
     {
-        $curlCommand .= qq( -d '$header')
+        $curlCommand .= qq( -d '$data');
     }
     if ($isPOST)
     {
-        ## TBD
+        $curlCommand .= qq( -X POST );
+    }
+    if ($header)
+    {
+        $curlCommand .= qq( -H "$header" );
     }
 
     ECHO_DEBUG("the final curl command is [$curlCommand]");
-    my $result = run_command($curlCommand); my $httpCode = $result->{'output'};
+    my $result = run_command($curlCommand,1); my $httpCode = $result->{'output'};
+    my $content;
 
-    open OUTPUT, $outputFile or die {ECHO_ERROR("Can not open output file [$outputFile]!") } ;
-    my $content=<OUTPUT>; 
-    ECHO_DEBUG("The content of the file is [$content]");
-    close OUTPUT;
-
+    if (-f $outputFile)
+    {
+        open OUTPUT, $outputFile or die {ECHO_ERROR("Can not open output file [$outputFile]!") } ;
+        $content=<OUTPUT>; 
+        ECHO_DEBUG("The content of the file is [$content]");
+        close OUTPUT;
+    }
     $result->{'code'} = $httpCode;
     $result->{'content'} = $content;
 
@@ -295,7 +412,7 @@ sub getContentFromURL
 
 sub run_command
 {
-    my ($cmd, $err_out) = @_;
+    my ($cmd, $onErrorContinue) = @_;
     my $run_info;
     $run_info->{'cmd'} = $cmd;
 
@@ -309,8 +426,16 @@ sub run_command
 
     if ($rc)
     {
-        ECHO_ERROR("Failed to excute command [$cmd], return code is $rc");
-        ECHO_ERROR("ERROR: [$run_info->{'output'}]", $err_out);
+        if ($onErrorContinue)
+        {
+            ECHO_ERROR("Failed to excute command [$cmd], return code is $rc",1);
+            ECHO_ERROR("ERROR: [$run_info->{'output'}]", 1);
+        }
+        else
+        {
+            ECHO_ERROR("Failed to excute command [$cmd], return code is $rc");
+            ECHO_ERROR("ERROR: [$run_info->{'output'}]");
+        }
     }
     else
     {

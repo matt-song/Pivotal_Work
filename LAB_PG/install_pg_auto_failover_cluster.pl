@@ -123,7 +123,7 @@ sub update_monitor_pghba
     ECHO_INFO("Updating monitor's pg_hba.conf...");
     my $monitor_hostname = $clusterInfo->{'monitorHost'};
     my $netmask = '16';
-    my $monitor_subnet = run_command(qq(ping monitor -c1 | grep "PING" | awk '{print \$3}' | sed 's/(//g' | sed 's/)//g' | awk -F'.' '{print $1"."$2".0.0"}'), 1);
+    my $monitor_subnet = run_command(qq(ping $clusterInfo->{'monitorHost'} -c1 | grep "PING" | awk '{print \$3}' | sed 's/(//g' | sed 's/)//g' | awk -F'.' '{print \$1"."\$2".0.0"}'), 1);
     my $pghba_line = qq(hostssl "pg_auto_failover" "autoctl_node" $monitor_subnet->{'output'}/$netmask trust);
     ECHO_INFO("Adding [$pghba_line] to $monitorDataFolder/pg_hba.conf...");
     open PGHBA,'>>', "$monitorDataFolder/pg_hba.conf" or do {ECHO_ERROR("unable to append to pg_hba.conf, exit!",1)};

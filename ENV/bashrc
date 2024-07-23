@@ -46,11 +46,13 @@ export PATH=$PATH:~/scripts;
 ### gcp ###
 alias vmlist='gcloud compute instances list | grep "^matt-"'
 alias aio='gcloud compute ssh gpadmin@matt-gpdb-aio --zone=asia-east2-a'
-alias pg='gcloud compute ssh postgres@matt-pgautofailover-monitor --zone=asia-east2-a'
+alias pg='gcloud compute ssh postgres@matt-paf-monitor --zone=asia-east2-a'
 alias gssh='gcloud compute ssh --zone=asia-east2-a'
 alias vmstart='gcloud compute instances start --zone=asia-east2-a'
 alias vmstop='gcloud compute instances stop --zone=asia-east2-a'
 alias gscp='gcloud compute scp --zone=asia-east2-a '
+alias lab2='ssh ubuntu@10.215.190.209'
+alias lab1='ssh ubuntu@10.83.69.176'
 
 bash /Users/xsong/scripts/update_mac_exlcude_proxy.sh > /dev/null 2>&1
 if [ "x$?" == 'x0' ];then
