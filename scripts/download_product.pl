@@ -1,11 +1,12 @@
 #!/usr/bin/perl
 =README
 #############################################################################
-Author:         Matt Song
-Creation Date:  2024.07.04
+Author:            Matt Song
+Date of creation:  2024.07.04
 
 Setup:
-- CPAN: install JSON
+1. run # cpan
+2. install JSON / install Text::Table
 
 Features:
 - Use this script to download the product of VMware GPDB/Postgres
@@ -13,14 +14,14 @@ Features:
 Workflow:
 1. List all the product (slug), choose the target product
 2. list the version, choose the version
-3. list all the package and download the target package
+3. list all the package 
+4. Accept the EULA and download the target package
 
 Others:
 - API doc: https://developer.broadcom.com/xapis/tanzu-api/latest/all-tanzu-apis
 
 Update:
-- <TBD>
-
+- 2024.08.05: minor bug fix, optimized the output.
 
 #############################################################################
 =cut
@@ -30,6 +31,7 @@ use Term::ANSIColor;
 use Getopt::Std;
 use File::Basename;
 use JSON;
+use Text::Table; ## format the output
 use Encode qw(encode_utf8);
 
 # use Switch;
@@ -40,7 +42,6 @@ my $workDir = "/tmp/download_product.$$";
 my $localTokenFolder = "$ENV{'HOME'}/.token";
 my $downloadFolder = '/data/packages';
 run_command("mkdir -p $workDir");  ## create work dir
-
 
 ### Start the work
 
@@ -57,6 +58,11 @@ my $targetReleaseInfo = getReleases($targetProductSlug);
 # print Dumper $loginInfo;
 getFileListFromRelease($targetProductSlug, $targetReleaseInfo->{'releaseID'}, $targetReleaseInfo->{'eula'}, $loginInfo->{'content'});
 
+
+
+
+###### Functions ######
+
 sub getFileListFromRelease
 {
     my ($slug,$releaseID,$eulaUrl,$accessToken) = @_;
@@ -68,17 +74,20 @@ sub getFileListFromRelease
         my $outputJson = $curlResult->{'content'};
         my $allFiles = decode_json($outputJson)->{'product_files'};
         # print Dumper $allFiles;
-        ECHO_INFO("Listing all files aviliable for download...");
+        ECHO_INFO("Listing all files aviliable for download...\n");
         my $id = 0; my $targetFile;
         ### generate the list
+        my $table = Text::Table->new("ID", "FILE");
         for my $file (sort @$allFiles)
         {
             $id++;
             $targetFile->{$id}->{'name'} = $file->{'name'};
             $targetFile->{$id}->{'url'} = $file->{'_links'}->{'download'};
             $targetFile->{$id}->{'fileName'}  = basename($file->{'aws_object_key'});
-            ECHO_SYSTEM(qq([$id]     $file->{'name'}));
+            # ECHO_SYSTEM(qq([$id]     $file->{'name'}));
+            $table->load(["[$id]    ", "$file->{'name'}    "]);
         }
+        print $table;
         while (1)
         {
             my $input=readAndReturn("Please choose the file you would like to download: [1 ~ $id]");
@@ -135,13 +144,8 @@ sub getFileListFromRelease
         {
             ECHO_ERROR("Unable to accept the eula from link [$eulaUrl], the token is [$accessToken], please check again try again!");
         }    
-
-
-
     }
-
 }
-
 
 sub getReleases
 {
@@ -168,10 +172,22 @@ sub getReleases
         my $found = 0;
         for my $release ( @$allReleases)
         {
-            if ($release->{'version'} eq '$input' )
+            # ECHO_DEBUG("input: [$input], checking [$release->{'version'}]...");
+            # print Dumper $release;
+            if ($release->{'version'} eq $input )
             {
                 ECHO_INFO("Found [$input]!");
                 $found = 1;
+                if ($found)
+                {
+                    my $result;
+                    $result->{'version'} = $release->{'version'};
+                    $result->{'releaseID'} = $release->{'id'};
+                    $result->{'eula'} = $release->{'_links'}->{'eula_acceptance'}->{'href'};
+                    # print Dumper $result;
+                    return $result;
+
+                }
             } 
         }
         unless ($found)
@@ -192,14 +208,18 @@ sub getReleases
         my $result;
         my $id = 0;
         # print Dumper $releaseHash;
-        for my $release (sort @$releaseHash)
+        my @sorted_array = sort { $a->{'version'} cmp $b->{'version'} } @$releaseHash;
+        my $table = Text::Table->new("ID", "VERSION");
+        for my $release (@sorted_array)
         {
             $id++;
             $result->{$id}->{'version'} = $release->{'version'};
             $result->{$id}->{'releaseID'} = $release->{'id'};
             $result->{$id}->{'eula'} = $release->{'_links'}->{'eula_acceptance'}->{'href'};
-            ECHO_SYSTEM(qq([$id]     $release->{'version'} ) );
+            # ECHO_SYSTEM(qq([$id]     $release->{'version'} ) );
+            $table->load(["[$id]    ", "$release->{'version'}    "]);
         }
+        print $table;
         while (1)
         {
             my $input = readAndReturn("Please choose which release you would like to download? []");
@@ -210,18 +230,11 @@ sub getReleases
             else
             {   
                 # print Dumper $result->{$id};
-                return $result->{$id};
+                return $result->{$input};
             }
         }
     }
 }
-
-
-
-
-
-
-###### Functions ######
 
 sub loginTanzuNet
 {
@@ -319,32 +332,25 @@ sub getAllDatabaseProduct
 
     my $productListForDB;
     my $id = 0;
+    my $table = Text::Table->new("ID", "SLUG", "Description");
     for my $product (@$allProducts)
     {
         my $productName = encode_utf8($product->{'name'});
         if ($productName  =~ /greenplum|postgres/i)
         {
             $id++;
-            # my $slug = $product->{'slug'}; 
             $productListForDB->{$id}->{'slug'} = $product->{'slug'}; 
             $productListForDB->{$id}->{'product'} = $productName;
-            # ECHO_INFO("Find product $productName ");
-            # ECHO_INFO("  slug = $product->{'slug'} ");
+            $table->load(["[$id]    ", "$productListForDB->{$id}->{'slug'}    ", "$productListForDB->{$id}->{'product'}"]);
         }
         else
         {
             next;
         }
     }
+    ECHO_INFO("Here is the product list: \n");
+    print $table;
 
-#          '1' => {
-#                   'product' => 'VMware Tanzu Greenplum® Command Center',
-#                   'slug' => 'gpdb-command-center'}
-    ECHO_INFO("Here is the product list: ");
-    for (my $i == 1; $i <= $id; $i++ )
-    {
-        ECHO_SYSTEM("$i      $productListForDB->{$i}->{'slug'}      $productListForDB->{$i}->{'product'}");
-    }
     while (1)
     {
         my $choice = readAndReturn("\nplease choose which one you would like to download: [1~$id]");
@@ -359,8 +365,6 @@ sub getAllDatabaseProduct
         }
     }
 }
-
-
 
 ### get the content of the URL, only return value if http code is 200, save the outpout into workfolder
 ### example curl -o /tmp/aaa -s -w "%{http_code}\n" https://network.tanzu.vmware.com/api/v2/products
@@ -408,7 +412,6 @@ sub getContentFromURL
     }
     return $result;
 }
-
 
 sub run_command
 {
