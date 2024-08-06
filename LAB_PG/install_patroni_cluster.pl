@@ -286,11 +286,25 @@ sub InstallPostgresRpm
     my $clusterInfo = shift;
 
     ### install RPM on all host ###
-    ### TBD: if v16, need install  vmware-postgres16-libs-16.3-1.el8.x86_64.rpm first
+=remove
+    ## check if the server package requre lib package, which is newly added in 14.x, 15.7, 16.3 ...
+    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs") );
+    my $needLibRPM = 0;
+    if ($checkIfNeedLibRPM->{'output'} )
+    {
+        ECHO_INFO("The package [$installationFile] requires lib package");
+        my $needLibRPM = 1;
+        unless ($installationLibFile)
+        {
+            ECHO_ERROR("Missing lib package, please assign the location of the lib package with -l <package name>");
+        }
+    }
+=cut
     foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) 
     {
-        if ($clusterInfo->{'majorVer'} >= 16)
+        if ($clusterInfo->{'libPackage'})
         {
+            ECHO_INFO("this package [$installationFile] depends on lib package [$clusterInfo->{'libPackage'}], install it first...");
             installRpm($dataNode, $installationLibFile);
         }
         installRpm($dataNode, $installationFile);
@@ -461,13 +475,13 @@ sub doThePreCheck
 
     print_help("Can not find target rpm file [$installationFile]!") unless ( -f $installationFile);
     print_help("Can not find target patroni rpm file [$installationPatroniFile]!") unless ( -f $installationPatroniFile);
-    print_help("please HA proxy's hostname!") if (! $haProxyHost);
+    # print_help("please HA proxy's hostname!") if (! $haProxyHost);
     print_help("please input data node's hostname!") if (! $dataNodeHosts);
     ECHO_INFO("Creating work directory [$workDir]");
     run_command("mkdir -p $workDir",1);  ## create work dir
 
     $clusterInfo->{'dataNodeList'} =  $dataNodeHosts;
-    $clusterInfo->{'haProxyHost'} =  $haProxyHost;
+    # $clusterInfo->{'haProxyHost'} =  $haProxyHost;
     $clusterInfo->{'package'} = basename($installationFile);
     # $clusterInfo->{'patroniPackage'} = $installationPatroniFile;
     
@@ -482,21 +496,27 @@ sub doThePreCheck
         ECHO_ERROR("Unable to determine the version of postgres, please check the file and try again", 1);
     }
 
-    ### In PG16 we must install lib first
-    if ($clusterInfo->{'majorVer'} >= 16)
+    ## check if the server package requre lib package, which is newly added in 14.x, 15.7, 16.3 ...
+    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs") );
+    my $needLibRPM = 0;
+    if ($checkIfNeedLibRPM->{'output'} )
     {
-        ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1) unless (-f $installationLibFile);
-=remove
-        if( -f $installationLibFile )
+        ECHO_INFO("The package [$installationFile] requires lib package");
+        my $needLibRPM = 1;
+        unless ($installationLibFile)
         {
-            $clusterInfo->{'libPackage'} =  $installationLibFile;
+            ECHO_ERROR("Missing lib package, please assign the location of the lib package with -l <package name>",1);
         }
         else
         {
-            ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1)
+            $clusterInfo->{'libPackage'}=$installationLibFile;
         }
-=cut
     }
+#    ### In PG16 we must install lib first
+#    if ($clusterInfo->{'majorVer'} >= 16)
+#    {
+#        ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1) unless (-f $installationLibFile);
+#    }
 
     ECHO_SYSTEM("
 ##############################################
@@ -512,7 +532,6 @@ Installation source:
 Cluster settings:
 
     Target Version:    \t[$clusterInfo->{'pgVersion'}]
-    HA proxy host:     \t[$haProxyHost]
     DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
     ETCD host:         \t[$clusterInfo->{'dataNodeList'}]
     DataNode's PGDATA: \t[$dataNodeDataFolder]
@@ -531,7 +550,7 @@ sub cleanUp
     my $clusterInfo = shift;
     my $sshTimeout = 3;
     
-    testSudo($clusterInfo->{'haProxyHost'});
+    # testSudo($clusterInfo->{'haProxyHost'});
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {testSudo($_);};
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {cleanOldPatroni($_);};
     foreach (split(/,/,$clusterInfo->{'dataNodeList'})) {removeOldRPM($_);};
