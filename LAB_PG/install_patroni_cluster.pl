@@ -28,7 +28,8 @@ Others:
     3. PATH
 
 Update:
-- N/A
+- 2024.08.06 optimized the way to check if we need lib package or not
+- 2024.08.08 optimized the way how etcd been deploied
 #############################################################################
 =cut
 
@@ -54,10 +55,8 @@ my $patroniScope = 'patroni_cluster';
 my $dataNodeDataFolder = "/data/database";
 my $tempFolder = '/tmp';
 my $workDir = "/tmp/setup_patroni.$$";
-# my $PgAutoFailoverServiceConf = '/etc/systemd/system/pgautofailover.service';
 my $bashrcInclude = "/home/postgres/.bashrc_patroni";
-my $subNet = '10.216.2.0/24';
-
+my $subNet = '10.0.0.0/8';
 
 my $etcdVer = '3.4.32';
 my $etcdDataFolder = '/data/etcd';
@@ -341,44 +340,76 @@ sub setupETCD
     
     ### Setup ETCD, if we had odd number of nodes, then install etcd on each node
     ## if not odd number, then install etcd on single node.
-    my $nodeCount = scalar (split(/,/,$clusterInfo->{'dataNodeList'}));   
-    if ($nodeCount % 2 != 0 )
+    my $nodeCount = scalar (split(/,/,$clusterInfo->{'dataNodeList'})); 
+
+    ## Update on 2024.08.08:  
+    ## if data node > 3, install etcd on node1,2,3; if data node < 3, only install etcd on node1
+    my @targetETCDnode;
+    if ($nodeCount >= 3 )
     {
+        ECHO_INFO("We have [$nodeCount] data node, install etcd on first 3 of the node");
+        ### find first 3 nodes in array
+        my @allEtcdNode = split(/,/,$clusterInfo->{'dataNodeList'});
         ### Generate initial-cluster settings for ETCD
         my $settings_initialcluster = "initial-cluster: '";
-        foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) { $settings_initialcluster .= qq($dataNode=http://$dataNode:2380,); }
+
+        for my $i (0 .. 2) 
+        {
+            my $dataNode = $allEtcdNode[$i]; 
+            push(@targetETCDnode, $dataNode);
+            $settings_initialcluster .= qq($dataNode=http://$dataNode:2380,); 
+            ECHO_DEBUG("adding $dataNode, current line is [$settings_initialcluster]");
+        }
+
+        # foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) { $settings_initialcluster .= qq($dataNode=http://$dataNode:2380,); }
         $settings_initialcluster =~ s/,$/'/;
         ECHO_DEBUG("the settings_initialcluster is [$settings_initialcluster]");
 
-        foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'}))
+        # foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'}))
+        for my $i (0 .. 2) 
         {
+            my $dataNode = $allEtcdNode[$i]; 
             cleanUpOldEtcdFolder($dataNode);
             configETCD($dataNode, $settings_initialcluster);
         }
-    }else{
-        ## TDB
-        ECHO_ERROR("Must have odd number of nodes, we do not support non-odd number yet, TDB",1);
+    }
+    else
+    {
+        ## Install ETCD on first server
+        ### find first nodes in array
+        ECHO_SYSTEM("We have [$nodeCount] data node, less than 3, install etcd on first node only");
+        my @allEtcdNode = split(/,/,$clusterInfo->{'dataNodeList'});
+        my $dataNode = $allEtcdNode[0]; 
+        push(@targetETCDnode, $dataNode);
+        my $settings_initialcluster = "initial-cluster: '$dataNode=http://$dataNode:2380'";
+        ECHO_DEBUG("the settings_initialcluster is [$settings_initialcluster]");
+        cleanUpOldEtcdFolder($dataNode);
+        configETCD($dataNode, $settings_initialcluster);
     }
 
     ### start ETCD ###
-    foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) { startETCD($dataNode); }
+    # foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) { startETCD($dataNode); }
+    foreach my $dataNode (@targetETCDnode) { startETCD($dataNode); }
 
     ### validate ###
-    foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'}))
+    # foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'}))
+    foreach my $dataNode (@targetETCDnode)
     {
         ECHO_INFO("Validating the etcd on host [$dataNode]...");
         my $cmd_validate = qq(etcdctl --endpoints=http://$dataNode:2380 endpoint health);
         run_command(qq(ssh ${pgUser}\@${dataNode} "$cmd_validate" ),1);
     }
     ECHO_INFO("All good, the ETCD cluster is now ready to use, summary: ");
-    my $etcdNode=(split(/,/,$clusterInfo->{'dataNodeList'}))[0];
+    # my $etcdNode=(split(/,/,$clusterInfo->{'dataNodeList'}))[0];
+    my $etcdNode=$targetETCDnode[0];
     my $cmd_etcdCluster = qq(etcdctl endpoint status --write-out=table --endpoints=http://$etcdNode:2379 --cluster);
     my $result = run_command(qq(ssh ${pgUser}\@${etcdNode} "$cmd_etcdCluster" ),1);
     ECHO_SYSTEM($result->{'output'});
 
     ## generate etcd url: 'pat1:2379,pat2:2379,pat3:2379'
     my $etcdUrl = '';
-    foreach my $node (split(/,/,$clusterInfo->{'dataNodeList'}))
+    # foreach my $node (split(/,/,$clusterInfo->{'dataNodeList'}))
+    foreach my $node (@targetETCDnode)
     {
         $etcdUrl .= "${node}:2379,"
     }
@@ -497,7 +528,7 @@ sub doThePreCheck
     }
 
     ## check if the server package requre lib package, which is newly added in 14.x, 15.7, 16.3 ...
-    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs") );
+    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs" || echo ) );
     my $needLibRPM = 0;
     if ($checkIfNeedLibRPM->{'output'} )
     {
@@ -512,16 +543,22 @@ sub doThePreCheck
             $clusterInfo->{'libPackage'}=$installationLibFile;
         }
     }
-#    ### In PG16 we must install lib first
-#    if ($clusterInfo->{'majorVer'} >= 16)
-#    {
-#        ECHO_ERROR("We are installing VMware PG >= 16, must install vmware-postgres*-libs-*.rpm first!, please assign the correct package location with -l ",1) unless (-f $installationLibFile);
-#    }
-
+    ### get the etcd list
+    my $countOfDataNode = scalar (split(/,/,$clusterInfo->{'dataNodeList'})); 
+    my $etcdHostList;
+    my @allDataNode = split(/,/,$clusterInfo->{'dataNodeList'});
+    if ($countOfDataNode >= 3)
+    {
+        $etcdHostList = "$allDataNode[0],$allDataNode[1],$allDataNode[2]";
+    }
+    else
+    {
+        $etcdHostList = "$allDataNode[0]";
+    }
     ECHO_SYSTEM("
-##############################################
-PG_AUTO_FAILOVER Cluster Installation Summary: 
-##############################################
+######################################
+PATRONI Cluster Installation Summary: 
+###################################### 
 
 Installation source:
 
@@ -533,7 +570,7 @@ Cluster settings:
 
     Target Version:    \t[$clusterInfo->{'pgVersion'}]
     DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
-    ETCD host:         \t[$clusterInfo->{'dataNodeList'}]
+    ETCD host:         \t[$etcdHostList]
     DataNode's PGDATA: \t[$dataNodeDataFolder]
 
 !!! WARNNING !!!
