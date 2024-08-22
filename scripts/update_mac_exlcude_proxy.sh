@@ -16,10 +16,10 @@ domain_list="
 *.eng.vmware.com
 *.oc.vmware.com
 *.broadcom.net
-*.wolkenservicedesk.com
 "
 # *.confluence.eng.vmware.com
 # *.vmware.com
+# *.wolkenservicedesk.com
 
 cur_list=`networksetup -getproxybypassdomains "WI-FI"`
 need_add=''
