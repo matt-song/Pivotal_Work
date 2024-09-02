@@ -11,11 +11,11 @@ fi
 domain_list="
 *.jd.com
 *.bilibili.com
-*.wolkenservicedesk.com
 *.jira.eng.vmware.com
 *.eng.vmware.com
 *.oc.vmware.com
 *.broadcom.net
+*.broadcom.com
 "
 # *.confluence.eng.vmware.com
 # *.vmware.com

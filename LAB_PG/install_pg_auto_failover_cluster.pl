@@ -45,12 +45,13 @@ use Term::ANSIColor;
 use Getopt::Std;
 use File::Basename;
 # use Switch;
-my %opts; getopts('hf:Dym:d:', \%opts);
+my %opts; getopts('hf:Dym:d:l:', \%opts);
 my $monitorHost = $opts{'m'};
 my $dataNodeHosts = $opts{'d'};
 my $installationFile=$opts{'f'};
 my $ALL_YES = $opts{'y'};
 my $DEBUG = $opts{'D'};
+my $installationLibFile=$opts{'l'};
 
 ### please review and edit below settings if needed ###
 my $pgUser = 'postgres';
@@ -232,7 +233,7 @@ sub doThePreCheck
 {
     my $clusterInfo = {};
 
-    print_help("Can not find target rpm file [#installationFile]!") unless ( -f $installationFile);
+    print_help("Can not find target rpm file [$installationFile]!") unless ( -f $installationFile);
     print_help("please input monitor's hostname!") if (! $monitorHost);
     print_help("please input data node's hostname!") if (! $dataNodeHosts);
     ECHO_INFO("Creating work directory [$workDir]");
@@ -252,7 +253,27 @@ sub doThePreCheck
     {
         ECHO_ERROR("Unable to determine the version of postgres, please check the file and try again", 1);
     }
-    ECHO_SYSTEM("
+
+    ## check if the server package requre lib package, which is newly added in 14.x, 15.7, 16.3 ...
+    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs" || echo ) );
+    my $needLibRPM = 0;
+    if ($checkIfNeedLibRPM->{'output'} )
+    {
+        ECHO_INFO("The package [$installationFile] requires lib package");
+        my $needLibRPM = 1;
+        unless ($installationLibFile)
+        {
+            ECHO_ERROR("Missing lib package, please assign the location of the lib package with -l <package name>",1);
+        }
+        else
+        {
+            $clusterInfo->{'libPackage'}=basename($installationLibFile);
+        }
+    }
+
+
+    ECHO_SYSTEM(
+qq(
 ##############################################
 PG_AUTO_FAILOVER Cluster Installation Summary: 
 ##############################################
@@ -263,10 +284,14 @@ Moniotr's PGDATA:  \t[$monitorDataFolder]
 DataNode host:     \t[$clusterInfo->{'dataNodeList'}]
 DataNode's PGDATA: \t[$dataNodeDataFolder]
 
+Installation RPM:  \t[$clusterInfo->{'package'}]
+Installation LIB:  \t[$clusterInfo->{'libPackage'}]
+
 !!! WARNNING !!!
 Once you choose to continue, We will delete all the content in above folder, and will also destroy the previous pg_auto_ctl cluster (if exsits)
 There is NO ROLLBACK! Please proceed with cautions!
-");
+)
+);
     user_confirm("Do you want continue? <yes/no>");
     # print Dumper $clusterInfo;
 =comment
@@ -463,6 +488,13 @@ sub installPgAutoFailoverOnAllHosts
     my $clusterInfo = shift;
 
     ### install RPM on all host ###
+    if ($clusterInfo->{'libPackage'})
+    {
+        ECHO_INFO("this package [$installationFile] depends on lib package [$clusterInfo->{'libPackage'}], install it first...");
+        installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'libPackage'});
+        foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'libPackage'});};
+    }
+
     installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'package'});
     foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'package'});};
 
@@ -473,8 +505,8 @@ sub installPgAutoFailoverOnAllHosts
     sub installRpm
     {
         my ($host, $rpm)= @_;
-        ECHO_INFO(qq(Copying [$installationFile] to server [$host]'s [$tempFolder]...));
-        my $cmd_scpFile = qq(scp $installationFile ${pgUser}\@${host}:${tempFolder});
+        ECHO_INFO(qq(Copying [$rpm] to server [$host]'s [$tempFolder]...));
+        my $cmd_scpFile = qq(scp $rpm ${pgUser}\@${host}:${tempFolder});
         run_command($cmd_scpFile,1);
 
         ECHO_INFO(qq(Installing [$rpm] on server [$host]...));
