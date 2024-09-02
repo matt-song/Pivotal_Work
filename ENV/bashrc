@@ -34,6 +34,7 @@ alias logserver="ssh paassupport@tanzu-csp-1.tanzu-gss-labs.vmware.com"
 alias new_logserver="ssh xs031601@broadcom.net@vcf-csp.acc.broadcom.net"
 # alias new_logserver="ssh vcf-csp-stage.acc.broadcom.net"
 # alias pg="ssh postgres@paf-m"
+alias ubuntu='bash /Users/xsong/scripts/connect_to_ubuntu.sh'
 
 PATH="/Users/xsong/perl5/bin${PATH:+:${PATH}}"; export PATH;
 PERL5LIB="/Users/xsong/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
