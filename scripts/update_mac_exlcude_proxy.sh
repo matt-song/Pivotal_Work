@@ -9,14 +9,17 @@ fi
 
 ### the list you would like to add:
 domain_list="
-*.jd.com
-*.bilibili.com
-*.jira.eng.vmware.com
-*.eng.vmware.com
-*.oc.vmware.com
-*.broadcom.net
+*.nimbus.eng.vmware.com
 *.broadcom.com
+*.workspaceair.com
+*.broadcom.net
+*.vmware.com
 "
+#*.jd.com
+#*.bilibili.com
+#*.jira.eng.vmware.com
+#*.oc.vmware.com
+#*.eng.vmware.com
 # *.confluence.eng.vmware.com
 # *.vmware.com
 # *.wolkenservicedesk.com

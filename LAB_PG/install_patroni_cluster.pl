@@ -285,20 +285,6 @@ sub InstallPostgresRpm
     my $clusterInfo = shift;
 
     ### install RPM on all host ###
-=remove
-    ## check if the server package requre lib package, which is newly added in 14.x, 15.7, 16.3 ...
-    my $checkIfNeedLibRPM = run_command(qq(rpm -qp $installationFile --requires | grep "vmware-postgres.*-libs") );
-    my $needLibRPM = 0;
-    if ($checkIfNeedLibRPM->{'output'} )
-    {
-        ECHO_INFO("The package [$installationFile] requires lib package");
-        my $needLibRPM = 1;
-        unless ($installationLibFile)
-        {
-            ECHO_ERROR("Missing lib package, please assign the location of the lib package with -l <package name>");
-        }
-    }
-=cut
     foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) 
     {
         if ($clusterInfo->{'libPackage'})

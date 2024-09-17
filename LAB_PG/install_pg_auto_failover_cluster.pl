@@ -37,6 +37,10 @@ VMWare Postgres version has been tested:
 Update:
 - 2023.03.28 first draft
 - 2023.04.05 adding code to update ~/.bashrc file after new setup
+
+bug to fix:
+1. rpm -e need put server package at first
+2. scp need use full path
 #############################################################################
 =cut
 use strict;
@@ -242,6 +246,7 @@ sub doThePreCheck
     $clusterInfo->{'dataNodeList'} =  $dataNodeHosts;
     $clusterInfo->{'monitorHost'} =  $monitorHost;
     $clusterInfo->{'package'} = basename($installationFile);
+    $clusterInfo->{'packageDir'} = dirname($installationFile);
 
     if ($clusterInfo->{'package'} =~ /^vmware-postgres(\d*)-(\d+\.\d+)-\d.*rpm$/)
     {
@@ -267,7 +272,8 @@ sub doThePreCheck
         }
         else
         {
-            $clusterInfo->{'libPackage'}=basename($installationLibFile);
+            $clusterInfo->{'libPackage'} = basename($installationLibFile);
+            $clusterInfo->{'libPackageDir'} = dirname($installationLibFile);
         }
     }
 
@@ -293,7 +299,7 @@ There is NO ROLLBACK! Please proceed with cautions!
 )
 );
     user_confirm("Do you want continue? <yes/no>");
-    # print Dumper $clusterInfo;
+    print Dumper $clusterInfo;
 =comment
 $VAR1 = {
           'pgVersion' => '13.8',
@@ -355,21 +361,38 @@ sub cleanUp
         my $host = shift;
         ECHO_INFO("cleanup previous installed vmware postgres rpm package on host [$host]..");
 
-        ##### note: adding echo here to eliminate unnecessary error, sort the output to let other package (like vmware-postgres13-devel-13.8-1.el7.x86_64) been removed first
+        ### Update: adding a loop to keep cleanup until finish
+        my $retry = 5;
         my $cmd_rpmQuery = qq(rpm -qa | grep vmware-postgres | sort -r || echo "");   
-        my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
-
-        foreach (split(/^/,$return->{'output'})) 
+        while ( $retry >= 0 )
         {
-            chomp(my $rpm = $_);
-            my $cmd_rpmRemove = "sudo rpm -e $rpm";
-            ECHO_INFO("Removing rpm [$rpm] on host [$host]...");
-            run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmRemove"),1);
-        }
-        ## check again to make sure it has been removed
-        my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
-        ECHO_ERROR("Failed to remove the rpm on host [$host], we still have below files: $return->{'output'}...") if ($return->{'output'});
+            ### delete the package one by one, try again if any of the package failed.
+            my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
 
+            foreach (split(/^/,$return->{'output'})) 
+            {
+                chomp(my $rpm = $_);
+                my $cmd_rpmRemove = "sudo rpm -e $rpm";
+                ECHO_INFO("Removing rpm [$rpm] on host [$host]...");
+                run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmRemove"));
+            }
+            ## check again to make sure it has been removed
+            my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
+            if ($return->{'output'})
+            {
+                ECHO_SYSTEM("[WARN] Failed to remove the rpm on host [$host], we still have below files: $return->{'output'}, retrying #[$retry] ...");
+                $retry--;
+            }
+            else 
+            {
+                ECHO_INFO("All old rpm has been cleaned up.");
+                last;
+            }      
+        }
+        ## at the end of the loop, check again;
+        my $return = run_command (qq(ssh ${pgUser}\@${host} "$cmd_rpmQuery"));
+        ECHO_ERROR("Failed to remove the rpm on host [$host] after [$retry] tries, we still have below files: $return->{'output'}",1) if ($return->{'output'});
+        
         ## delete the config folder
         foreach my $folder (@pgAutoFailoverConfFolder)
         {
@@ -491,12 +514,12 @@ sub installPgAutoFailoverOnAllHosts
     if ($clusterInfo->{'libPackage'})
     {
         ECHO_INFO("this package [$installationFile] depends on lib package [$clusterInfo->{'libPackage'}], install it first...");
-        installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'libPackage'});
-        foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'libPackage'});};
+        installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'libPackage'},$clusterInfo->{'libPackageDir'});
+        foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'libPackage'}, $clusterInfo->{'libPackageDir'});};
     }
 
-    installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'package'});
-    foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'package'});};
+    installRpm($clusterInfo->{'monitorHost'}, $clusterInfo->{'package'},$clusterInfo->{'packageDir'});
+    foreach my $dataNode (split(/,/,$clusterInfo->{'dataNodeList'})) {installRpm($dataNode, $clusterInfo->{'package'},$clusterInfo->{'packageDir'});};
 
     ### Update /etc/systemd/system/pgautofailover.service ###
     updateOSServiceConfig($clusterInfo->{'monitorHost'},$clusterInfo->{'pgVersion'},$monitorDataFolder );
@@ -504,9 +527,11 @@ sub installPgAutoFailoverOnAllHosts
 
     sub installRpm
     {
-        my ($host, $rpm)= @_;
-        ECHO_INFO(qq(Copying [$rpm] to server [$host]'s [$tempFolder]...));
-        my $cmd_scpFile = qq(scp $rpm ${pgUser}\@${host}:${tempFolder});
+        my ($host, $rpm, $rpmDir)= @_;
+        my $sourceFile = "${rpmDir}/${rpm}";
+
+        ECHO_INFO(qq(Copying [$sourceFile] to server [$host]'s [$tempFolder]...));
+        my $cmd_scpFile = qq(scp $sourceFile ${pgUser}\@${host}:${tempFolder});
         run_command($cmd_scpFile,1);
 
         ECHO_INFO(qq(Installing [$rpm] on server [$host]...));
