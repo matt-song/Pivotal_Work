@@ -37,10 +37,7 @@ VMWare Postgres version has been tested:
 Update:
 - 2023.03.28 first draft
 - 2023.04.05 adding code to update ~/.bashrc file after new setup
-
-bug to fix:
-1. rpm -e need put server package at first
-2. scp need use full path
+- 2024.09.17 minor bug fix
 #############################################################################
 =cut
 use strict;
@@ -299,16 +296,7 @@ There is NO ROLLBACK! Please proceed with cautions!
 )
 );
     user_confirm("Do you want continue? <yes/no>");
-    print Dumper $clusterInfo;
-=comment
-$VAR1 = {
-          'pgVersion' => '13.8',
-          'monitorHost' => 'monitor',
-          'package' => 'vmware-postgres13-13.8-1.el7.x86_64.rpm',
-          'majorVer' => '13',
-          'dataNodeList' => 'node1,node2'
-        };
-=cut
+    # print Dumper $clusterInfo;
     return $clusterInfo;
 }
 
