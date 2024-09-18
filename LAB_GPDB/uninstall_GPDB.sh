@@ -49,7 +49,16 @@ check_gpdb_running()
 {
     build=$1
     gp_ver=`echo $build | sed 's/greenplum_//g'`
-    isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
+    
+    isRunning=''
+    gp_majorVer=`echo $gp_ver | cut -d'.' -f 1`
+    if [ $gp_majorVer -le 6 ]
+    then
+        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
+    else
+        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+    fi
+
     if [ "x$isRunning" != 'x0' ]
     then
         ECHO_WARN "GPDB installed in [/opt/$build] is running! Please stop the DB first, exit!"
@@ -71,7 +80,7 @@ uninstallGPDB()
 
     ### special design for smdw ###
     hostname=`uname -n`
-    if [ "x$hostname" == 'xsmdw' ] 
+    if [ "x$hostname" == 'xmdw' ] 
     then 
         port_md5_int=`echo "$gp_ver" | md5sum | awk '{print $1}' | tr a-f A-F `; port=`echo $port_md5_int % 9999 | bc`
         data_id=`echo $port % 2 + 1 | bc`

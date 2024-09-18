@@ -1,29 +1,27 @@
 #!/usr/bin/perl
-###########################################################################################
-# Author:      Matt Song                                                                  #
-# Create Date: 2019.05.02                                                                 #
-# Description: Install GPDB in cluster, special designed for smdw                         #
-#                                                                                         #
-# Some notes here:                                                                        #
-#                                                                                         #
-# - The script will read the segment list from $segment_list_file                         #
-#                                                                                         #
-# - PGPORT generate basd on md5 of gp version, for example:                               #
-#   echo `echo "5.17.0" | md5sum | awk '{print $1}' | tr a-f A-F ` % 9999 | bc            #
-#                                                                                         #
-# - All other port based on the master port                                               #
-#                                                                                         #
-# - No need to create greenplum-db link for GPHOME, set the value under greenplum-path.sh #
-#                                                                                         #
-# - dump for gp_info:                                                                     #
-#                                                                                         #
-#     $VAR1 = {                                                                           #
-#               'gp_port' => '2066',                                                      #
-#               'ver' => '5.16.0',                                                        #
-#               'gp_home' => '/opt/greenplum_5.16.0'                                      #
-#             };                                                                          #
-#                                                                                         #
-###########################################################################################
+=README
+###########################################################################################################
+Author:      Matt Song                                                                  
+Create Date: 2019.05.02                                                                 
+Description: Install GPDB in cluster, special designed for smdw                         
+                                                                                      
+Some notes here:                                                                        
+
+- if installing GP7 when GP6 has been installed, run this first:
+    # sudo yum -y install python3 python3-psycopg2 python3-psutil python3-pyyaml python3.11 python3.11-devel
+
+- The script will read the segment list from $segment_list_file
+- PGPORT generate basd on md5 of gp version, for example:
+    # echo `echo "5.17.0" | md5sum | awk '{print $1}' | tr a-f A-F ` % 9999 | bc
+
+- All other port based on the master port
+- No need to create greenplum-db link for GPHOME, set the value under greenplum-path.sh
+
+Update at 2024.09.18:
+- Add support for GPDB v7
+###########################################################################################################
+=cut
+
 use strict;
 use Data::Dumper;
 use Term::ANSIColor;
@@ -39,7 +37,7 @@ my $gpdp_home_folder = "/opt";
 my $gpdb_master_home = "/data/master";
 # $gpdb_segment_home = "/data1/segment";  ### the segmnet folder will be defined in install_gpdb_package
 my $gpdb_segment_num = 2;                   
-my $master_hostname = 'smdw';                                                          ## master host
+my $master_hostname = 'mdw';    ## master host
 my $gp_user = 'gpadmin';
 my $segment_list_file = "/home/gpadmin/all_segment_hosts.txt";
 
@@ -149,7 +147,7 @@ sub install_package_on_segment_server
             #run_command(qq(ssh $host "rpm -qa | grep greenplum"));
             if ($checkAlreadyInstalled->{'output'} > 0 )
             {
-                ECHO_SYSTEM("[WARN] already have GPv6 installed, use RPM command to install...");
+                ECHO_SYSTEM("[WARN] already have GPDB installed, use RPM command to install...");
                 run_command(qq(sudo ssh $host "rpm -ivh /tmp/${package_basename} --force --nodeps"),1);
             }
             else
@@ -323,12 +321,6 @@ sub install_gpdb_package
         {
             run_command(qq(sudo yum -y install ${package}),1);
         }
-        # my $installDBMaster=run_command(qq(sudo yum -y install $package));
-        #if ($installDBMaster ne 0 )
-        #{
-        #    ECHO_SYSTEM("[WARN] YUM installation failed, could because some higher version of GP6 has been installed, try to install with rpm command");
-        #    run_command(qq(sudo rpm -ivh $package --force),1);
-        #}
 
         my $find_default_folder = run_command(qq(ls -d /usr/local/greenplum-db-* | grep $gp_ver));
         my $default_folder = $find_default_folder->{'output'};
@@ -341,12 +333,6 @@ sub install_gpdb_package
         my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${package} 1>/dev/null));
         ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
     }
-
-=old    
-            ECHO_INFO("Installing GPDB package to [$gp_home]...");
-            my $result = run_command(qq( echo -e "yes\n$gp_home\nyes\nyes" | ${working_folder}/${binary} 1>/dev/null));
-            ECHO_ERROR("Failed to install GPDB into [$gp_home], please check the error and try again!",1) if ($result->{'code'});
-=cut
 
     ### adding the host list into GPDB home folder ###
     ECHO_INFO("Adding host list into [${gp_home}]...");
@@ -361,12 +347,27 @@ sub install_gpdb_package
 
     ### adding environment settings to greenplum_path.sh
     ECHO_INFO("updating [greenplum_path.sh]...");
-    open GP_PATH, '>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
+    open GP_PATH, '>>' , "$gp_home/greenplum_path.sh" or do {ECHO_ERROR("unable to write file [$gp_home/greenplum_path.sh], exit!",1)};
+    my $majorVer = (split(/\./,$gp_ver))[0];
+    if ($majorVer <= 6)
+    {
+        print GP_PATH qq(
+export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'
+export PGPORT=$gp_port
+export GPHOME=$gp_home
+);
+    }
+    else ## GP7
+    {
+        print GP_PATH qq(
+export COORDINATOR_DATA_DIRECTORY='${master_folder}/gpseg-1'
+export PGPORT=$gp_port
+export GPHOME=$gp_home
+);
+    }
+    close GP_PATH;
+=update
     
-    #my $LINE_MASTER_DATA_DIRECTORY = qq(export MASTER_DATA_DIRECTORY='${master_folder}/gpseg-1'\n);
-    #my $LINE_PGPORT = qq(export PGPORT=$gp_port\n);
-    #my $LINE_GPHOME = qq(export GPHOME=$gp_home\n);
-    # print GP_PATH "$LINE_MASTER_DATA_DIRECTORY"."$LINE_PGPORT"."$LINE_GPHOME";
 
     print GP_PATH qq(
 GPHOME=$gp_home
@@ -391,7 +392,8 @@ export PGPORT=$gp_port
 export GPHOME=$gp_home
 );
     close GP_PATH;
-   
+=cut
+
     ECHO_INFO("GPDB package has been successfully installed to [$gp_home]");
     # print Dumper $gp_info;
     return $gp_info;
@@ -462,7 +464,12 @@ sub init_gpdb
     ### initiate the gpdb server ###
     ECHO_INFO("Creating the gpinitsystem_config file to [$gp_home]..");
     open INIT, '>', "$gp_home/gpinitsystem_config" or do {ECHO_ERROR("unable to write file [$gp_home/gpinitsystem_config], exit!",1)};
-    my $gpinitsystem_config = qq(
+    my $gpinitsystem_config;
+    
+    my $majorVer = (split(/\./,$gp_ver))[0];
+    if ($majorVer <= 6)
+    {
+        $gpinitsystem_config = qq(
 ARRAY_NAME="gpdb_${gp_ver}"
 SEG_PREFIX=gpseg
 PORT_BASE=$sergment_port_base
@@ -477,6 +484,25 @@ MIRROR_PORT_BASE=$mirror_port_base
 REPLICATION_PORT_BASE=$replication_port_base
 MIRROR_REPLICATION_PORT_BASE=$mirror_replication_port_base
 $conf_mirror);
+    }
+    else
+    {
+        $gpinitsystem_config = qq(
+ARRAY_NAME="gpdb_${gp_ver}"
+SEG_PREFIX=gpseg
+PORT_BASE=$sergment_port_base
+$conf_primary
+COORDINATOR_HOSTNAME=$master_hostname
+COORDINATOR_DIRECTORY=$master_folder
+COORDINATOR_PORT=$master_port
+TRUSTED_SHELL=ssh
+CHECK_POINT_SEGMENTS=8
+ENCODING=UNICODE
+MIRROR_PORT_BASE=$mirror_port_base
+REPLICATION_PORT_BASE=$replication_port_base
+MIRROR_REPLICATION_PORT_BASE=$mirror_replication_port_base
+$conf_mirror);
+    }
 
     ECHO_DEBUG("the gpinitsystem_config file is like below [\n$gpinitsystem_config\n]");
     print INIT "$gpinitsystem_config";
@@ -650,11 +676,22 @@ sub check_gpdb_isRunning
     my $result;
 
     my $port = $config->{'gp_port'};
-    my $ver = $config->{'ver'};
+    my $ver = $config->{'ver'};  ## example: 7.3.1
     my $gphome = $config->{'gp_home'};
     
     ECHO_INFO("Checking if GPDB is running...");
-    my $result = run_command(qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep master | grep $port | awk '{print \$2","\$8}'));
+    
+    my $majorVer = (split(/\./,$ver))[0];
+    my $checkProcessCMD;
+    if ($majorVer <= 6)
+    {
+        $checkProcessCMD = qq(ps -ef | grep postgres | grep "\\-D" | grep master | grep "^gpadmin" | grep -v sh | awk '{print \$2","\$8}');
+    }
+    else ## GP7
+    {
+        $checkProcessCMD = qq(ps -ef | grep postgres | grep "\\-D" | grep -v grep | grep gp_role=dispatch | grep -w $ver | awk '{print \$2","\$8}');
+    }
+    my $result = run_command($checkProcessCMD);
     my ($pid,$gphome) = split(/,/,$result->{'output'});
     ($gphome = $gphome) =~ s/\/bin\/postgres//g;
     ECHO_DEBUG("GPDB pid: [$pid], GPHOM: [$gphome]");

@@ -49,6 +49,14 @@ switch_gpdb()
         fi
     else
         ECHO_SYSTEM "Switching build to [$gp_home]..."
+        
+        ### cleanup old settings
+        unset PYTHONHOME
+        unset PYTHONPATH
+        unset MASTER_DATA_DIRECTORY
+        unset COORDINATOR_DATA_DIRECTORY
+        unset LD_LIBRARY_PATH
+
         source ${GP_HOME}/${build}/greenplum_path.sh
         ECHO_SYSTEM "Done :)" 
         ### TBD: might need add some verification sql command to make sure the DB has been switched
@@ -89,7 +97,15 @@ do
     gp_ver=`echo $build |  sed 's/greenplum_//g'`
     gp_port=`get_port $gp_ver`
 
-    isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+    isRunning=''
+    gp_majorVer=`echo $gp_ver | cut -d'.' -f 1`
+    if [ $gp_majorVer -le 6 ]
+    then
+        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+    else
+        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+    fi
+    
     if [ "x$isRunning" == 'x0' ]
     then
         status="Offline"

@@ -108,7 +108,15 @@ then
 
         ### Check if GPDB is running ###
         status="${green}Online${normal}"
-        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+        isRunning=''
+
+        gp_majorVer=`echo $gp_ver | cut -d'.' -f 1`
+        if [ $gp_majorVer -le 6 ]
+        then
+            isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+        else
+            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+        fi
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
         declare -A SegmentUsage     ### hash for store space usage for all segment
@@ -142,13 +150,21 @@ else
     do
         gp_ver=`echo $build |  sed 's/greenplum_//g'`
         gp_port=`get_port $gp_ver`
-
+        
         status="${green}Online${normal}"
-        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+        isRunning=''
+
+        gp_majorVer=`echo $gp_ver | cut -d'.' -f 1`
+        if [ $gp_majorVer -le 6 ]
+        then
+            isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+        else
+            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+        fi
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
         ## check the last log time ##
-        source ${GP_HOME}/${build}/greenplum_path.sh
+        source ${GP_HOME}/${build}/greenplum_path.sh > /dev/null 2>&1 
 	log_file=`find $MASTER_DATA_DIRECTORY/pg_log/ -size +0 | grep gpdb- | tail -1`; 
         # echo "DEBUG: logfile is [$log_file]"
         last_log_date=`tail -200 $log_file | grep "^[0-9]*-[0-9]*-[0-9]* "|tail -1 | awk '{print $1,$2}' | sed 's/\..*//g'`
