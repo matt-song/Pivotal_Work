@@ -56,7 +56,7 @@ check_gpdb_running()
     then
         isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
     else
-        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver | wc -l`
     fi
 
     if [ "x$isRunning" != 'x0' ]

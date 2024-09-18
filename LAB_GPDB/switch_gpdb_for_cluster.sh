@@ -35,7 +35,14 @@ switch_gpdb()
     gp_home=${GP_HOME}/${build}
     gp_ver=`echo $build |  sed 's/greenplum_//g'`
     
-    isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | wc -l`
+    isRunning=''
+    gp_majorVer=`echo $gp_ver | cut -d'.' -f 1`
+    if [ $gp_majorVer -le 6 ]
+    then
+        isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
+    else
+        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver | wc -l`
+    fi
     if [ "x$isRunning" == 'x0' ] 
     then
         ECHO_WARN "GPDB installed in [/opt/$build] is not running! Do you want to start the DB first?"
@@ -103,7 +110,7 @@ do
     then
         isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
     else
-        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+        isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver | wc -l`
     fi
     
     if [ "x$isRunning" == 'x0' ]

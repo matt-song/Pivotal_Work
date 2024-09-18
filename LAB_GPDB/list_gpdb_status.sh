@@ -115,7 +115,7 @@ then
         then
             isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
         else
-            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver | wc -l`
         fi
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
@@ -159,7 +159,7 @@ else
         then
             isRunning=`ps -ef | grep postgres | grep master | grep "\-D" | grep "$gp_ver" | grep $gp_port | wc -l`
         else
-            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver`
+            isRunning=`ps -ef | grep postgres | grep "\-D" | grep -v grep | grep gp_role=dispatch | grep -w $gp_ver | wc -l`
         fi
         [ "x$isRunning" == 'x0' ] && status="${red}Offline${normal}"
 
