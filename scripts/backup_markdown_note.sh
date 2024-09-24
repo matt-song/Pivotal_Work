@@ -1,11 +1,12 @@
 #!/bin/bash
 
 today=`date +%F`
-home_folder='/Users/xsong/Documents/Work'
+home_folder='/Users/xs031601/Documents/typora_files'
 archive_folder="${home_folder}/999_Archive"
 target_folder_list='01_Cases 02_Jira'
 # target_folder_list='01_Cases 02_Jira 03_Others'
-backup_target='/Users/xsong/Downloads/box/backup/typora_backup'
+backup_target="${HOME}/Downloads/box/backup/typora_backup"
+mkdir -pv $backup_target
 
 ### create target backup folder ###
 mkdir -pv "${archive_folder}/${today}"
