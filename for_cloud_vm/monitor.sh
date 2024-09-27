@@ -32,6 +32,24 @@ check_load()
 
     echo -e "\n=== Checking top 10 CPU consumer: ===" | tee -a $tmpReportFile
     top -b -n 1 | grep "^ " | sort -k 9 -nr | grep -v "^    PID" | head -10 | tee -a $tmpReportFile 
+
+    ### check if any process having load greater than xx
+    limit=90
+    isAbnormal=0
+    IFS=$'\n'
+    for cpu_load in `top -b -n 1 | grep "^ " | sort -k 9 -nr | grep -v "^    PID" | head -10`
+    do
+        loadInt=`echo $cpu_load | awk '{print $9}' | sed 's/\..*//g'`
+        [ $loadInt -ge $limit ] && isAbnormal=1        
+    done
+    unset IFS
+    if [ "x$isAbnormal" = 'x1' ]
+    then
+        echo -e "\nSome process has high cpu usage, please review above output and check further" | tee -a $tmpReportFile
+        needSendMail=1
+    else
+        echo -e "\nAll processes looks good" | tee -a $tmpReportFile
+    fi
 }
 
 audit_log()
@@ -49,7 +67,6 @@ check_network()
     echo -e "\n=== Checking network connections" | tee -a $tmpReportFile 
     sudo netstat -antp 2>/dev/null | grep "^tcp" | awk '{print $6}' | sort | uniq -c | sort -nr | tee -a $tmpReportFile 
 }
-
 
 check_load
 audit_log

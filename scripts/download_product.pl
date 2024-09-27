@@ -5,8 +5,9 @@ Author:            Matt Song
 Date of creation:  2024.07.04
 
 Setup:
-1. run # cpan
-2. install JSON / install Text::Table
+1. # yum -y install gcc cpan
+2. # sudo cpan
+3. # install JSON / install Text::Table
 
 Features:
 - Use this script to download the product of VMware GPDB/Postgres
@@ -115,7 +116,10 @@ sub getFileListFromRelease
         my $decoded_json = decode_json($tokenString);
         my $accessToken = $decoded_json->{access_token};
         $accessToken = "Authorization: Bearer $accessToken";
-        my $curlResult = getContentFromURL($eulaUrl,'',1,$accessToken);
+
+        ## set the date to ' ' here, to avoid error "POST requests require a <code>Content-length<" 
+        ## refer to https://stackoverflow.com/questions/33492178/how-to-pass-content-length-value-in-header-using-curl-command
+        my $curlResult = getContentFromURL($eulaUrl,' ',1,$accessToken);  
         if ($curlResult->{'code'} == '200')
         {
             ECHO_INFO("Accepted EULA from link: [$eulaUrl]");
