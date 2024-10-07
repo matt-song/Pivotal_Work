@@ -2,6 +2,10 @@
 : ' 
 Note: this script will monitor the performance and abnormal logs, send the report to target user.
 Crontab: 
+### health check
+*/15 * * * * /bin/bash $HOME/scripts/monitor.sh > /dev/null 2>&1
+### send daily report
+00 13 * * * [ -f /tmp/.monitor_report.log ] && cat /tmp/.monitor_report.log | mail -s "Health check report for [`hostname`] at [`date`]" 'xiaobo.song@broadcom.com' > /dev/null 2>&1
 '
 mailList='xxxx@xxx.xx'
 tmpReportFile="/tmp/.monitor_report.log"
@@ -54,7 +58,7 @@ check_load()
 
 audit_log()
 {
-    today=`date | awk '{print $2,$3}'`
+    today=`date | cut -c 5-10`
     echo -e "\n=== Checking security logs of [$today] ===" | tee -a $tmpReportFile 
     echo -e "\n=> session opened for user list: "  | tee -a $tmpReportFile 
     sudo cat /var/log/secure  | grep "$today" | grep sshd | grep "session opened for user" | awk '{print $11}' | sort | uniq -c | sort -nr  | tee -a $tmpReportFile 
@@ -73,7 +77,7 @@ audit_log
 check_network
 echo "" | tee -a $tmpReportFile 
 
-if [ x"$needSendMail" = 'x1' ]
+if [ "x$needSendMail" == 'x1' ]
 then
     echo "Sending mail to [$mailList]..."
     cat $tmpReportFile | mail -s "Health check report for [`hostname`] at [`date`]" $mailList
